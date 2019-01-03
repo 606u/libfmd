@@ -2,6 +2,7 @@
 #  define LIB_FILE_METADATA_PRIV_H
 
 #  include "fmd.h"
+#  include <stdint.h>
 
 #  if !defined (FMDP_READ_PAGE_SZ)
 #    define FMDP_READ_PAGE_SZ 32768

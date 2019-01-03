@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <dirent.h>
@@ -198,8 +199,8 @@ fmd_scan_hier(int parent_dirfd,
 
 		struct dirent *entry;
 		while ((entry = readdir(dirp)) != NULL) {
-			struct FmdFile *file = 0;
-			if (path_len + entry->d_namlen + 1 >= sizeof fullpath)
+			size_t len = strlen(entry->d_name);
+			if (path_len + len + 1 >= sizeof fullpath)
 				continue; /* path too long */
 			if (entry->d_name[0] == '.' &&
 			    (entry->d_name[1] == '\0' ||
@@ -207,6 +208,7 @@ fmd_scan_hier(int parent_dirfd,
 			      entry->d_name[2] == '\0')))
 				continue; /* omit . and .. */
 
+			struct FmdFile *file = 0;
 			strcpy(fullpath + path_len, entry->d_name);
 			int res = fmd_scan_file(dirfd, fullpath, flags, &file);
 			if (!res && file) {
