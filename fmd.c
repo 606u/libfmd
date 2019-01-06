@@ -221,7 +221,6 @@ fmd_scan_hier(int parent_dirfd,
 			/* XXX: else keep track of errors */
 		}
 	}
-	closedir(dirp);
 
 	/* Breath first; time to scan directories */
 	struct FmdFile *it = rv;
@@ -229,7 +228,7 @@ fmd_scan_hier(int parent_dirfd,
 		if (it->filetype == fmdft_directory &&
 		    it->name[0] != '.') {
 			struct FmdFile *children = 0;
-			int res = fmd_scan_hier(dirfd, it->path, flags,
+			int res = fmd_scan_hier(dirfd, it->name, flags,
 						&children);
 			if (!res && children) {
 				/* Insert children right after
@@ -245,7 +244,8 @@ fmd_scan_hier(int parent_dirfd,
 		}
 		it = it->next;
 	}
-	close(dirfd);
+	/* closedir(3) will take care to close |dirfd| */
+	closedir(dirp);
 
 	*info = rv;
 	return 0;
