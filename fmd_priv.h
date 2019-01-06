@@ -38,43 +38,34 @@ struct FmdToken {
 int fmdp_match_token(const char *text, size_t len,
 		     const struct FmdToken *tokens);
 
-struct FmdCachePage {
-	uint8_t data[FMDP_READ_PAGE_SZ];
-	off_t offs, len;
+struct FmdStream {
+	/* Reads |len| bytes from |stream|, starting at |offs|, and
+	 * returns a pointer to a readen data; returns 0 if request
+	 * cannot be fulfilled, and sets |errno|. Signals ERANGE on
+	 * attempt to read before start or after end of file.
+	 *
+	 * Negative |offs| is translated to a seek, relative from
+	 * end-of-file.
+	 *
+	 * |len| should be up to FMDP_READ_PAGE_SZ.
+	 *
+	 * The pointer and the data referred are valid until next
+	 * |get()| or |close()| method calls */
+	const uint8_t* (*get)(struct FmdStream *stream,
+			      off_t offs, size_t len);
 
-	/* Keeps track of number of cache hits, as well as generation
-	 * (most/least recently used), so a newly read page, won't be
-	 * reclaimed soon after being read */
-	size_t hits, gen;
-};
+	/* Closes given |stream| */
+	void (*close)(struct FmdStream *stream);
 
-struct FmdReadState {
 	struct FmdFile *file;
-	int dirfd, fd;
-
-	/* Keep several pages with file data to minimize I/O */
-	/* Those pages are cache, as well as read buffers */
-	struct FmdCachePage *last_hit;
-	struct FmdCachePage page[FMDP_CACHE_PAGES];
-	size_t gen;
 };
-struct FmdReadState* fmdp_open(int dirfd, struct FmdFile *file);
-void fmdp_close(struct FmdReadState *rst);
-
-/* Reads file block at given offset and length; returns 1 upon
- * success, 0 if not possible, -1 on failure */
-struct FmdBlock {
-	uint8_t *ptr;
-	off_t offs, len;
-};
-int fmdp_read(struct FmdReadState *rst,
-	      struct FmdBlock *b);
+struct FmdStream* fmdp_open_file(int dirfd, struct FmdFile *file, int cached);
 
 /* Returns |len| big-endian bits from |offs|, also in bits */
 long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
 
 int fmdp_probe_file(int dirfd, struct FmdFile *info);
 
-int fmdp_do_flac(struct FmdReadState *rst);
+int fmdp_do_flac(struct FmdStream *stream);
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */

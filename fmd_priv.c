@@ -2,7 +2,9 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <errno.h>
 #include <limits.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -134,86 +136,71 @@ fmdp_match_token(const char *text, size_t len,
 }
 
 
-struct FmdReadState*
-fmdp_open(int dirfd, struct FmdFile *file)
+struct FmdCachePage {
+	uint8_t data[FMDP_READ_PAGE_SZ];
+	off_t offs, len;
+
+	/* Keeps track of number of cache hits, as well as generation
+	 * (most/least recently used), so a newly read page, won't be
+	 * reclaimed soon after being read */
+	size_t hits, gen;
+};
+struct FmdCachedStream {
+	struct FmdStream base;
+	struct FmdStream *next;
+
+	/* Keep several pages with file data to minimize I/O */
+	/* Those pages are cache, as well as read buffers */
+	struct FmdCachePage *last_hit;
+	struct FmdCachePage page[FMDP_CACHE_PAGES];
+	size_t gen;
+};
+#define FMDP_GET_CSTR(_stream)			\
+	(struct FmdCachedStream*)((_stream) - offsetof(struct FmdCachedStream, base))
+
+static const uint8_t*
+fmdp_cached_stream_get(struct FmdStream *stream,
+		       off_t offs, size_t len)
 {
-	assert(file);
+	assert(stream);
+	assert(len);
 
-	struct FmdReadState *res =
-		(struct FmdReadState*)calloc(1, sizeof *res);
-	if (!res)
-		return 0;
-
-	res->file = file;
-	res->dirfd = dirfd;
-	res->fd = openat(dirfd, dirfd != AT_FDCWD ? file->name : file->path,
-			 O_RDONLY);
-	if (res->fd == -1) {
-		free(res);
-		return 0;
-	}
-	res->last_hit = res->page;
-
-	/* Issue a request to read file header */
-	struct FmdBlock b = { 0, 0, FMDP_READ_PAGE_SZ };
-	fmdp_read(res, &b);
-
-	return res;
-}
-
-
-void
-fmdp_close(struct FmdReadState *rst)
-{
-	assert(rst);
-	close(rst->fd);
-	free(rst);
-}
-
-
-int
-fmdp_read(struct FmdReadState *rst,
-	  struct FmdBlock *b)
-{
-	assert(rst);
-	assert(b);
-
+	struct FmdCachedStream *cstr = FMDP_GET_CSTR(stream);
 	/* Convert offsets, relative to end-of-file to absolute
 	 * offsets; also make sure request is within file size */
-	const off_t filesize = rst->file->stat.st_size;
-	if (b->offs < 0)
-		b->offs = filesize - b->offs;
-	if (b->offs < 0)
-		b->offs = 0;
-	if (b->offs + b->len > filesize)
-		b->len = filesize - b->offs;
-	if (!b->len)
-		return 0;	/* zero-length file, perhaps */
+	const off_t filesize = stream->file->stat.st_size;
+	if (offs < 0)
+		offs = filesize - offs;
+	if (offs < 0 ||
+	    offs + (off_t)len > filesize ||
+	    !len) {
+		errno = ERANGE;
+		return 0;
+	}
 
 	/* Check if read request can be fulfilled from the cache */
 	/* Also keep a track of best page to read into */
-	struct FmdCachePage *unused = 0, *best = rst->page;
-	const struct FmdCachePage *endp = rst->page + FMDP_CACHE_PAGES;
-	struct FmdCachePage *it = rst->last_hit;
+	struct FmdCachePage *unused = 0, *best = cstr->page;
+	const struct FmdCachePage *endp = cstr->page + FMDP_CACHE_PAGES;
+	struct FmdCachePage *it = cstr->last_hit;
 	do {
-		if (it->offs <= b->offs &&
-		    it->offs + it->len >= b->offs + b->len) {
+		if (it->offs <= offs &&
+		    it->offs + it->len >= offs + (off_t)len) {
 			/* Found in cache */
 			++it->hits;
-			it->gen = ++rst->gen;
-			rst->last_hit = it;
+			it->gen = ++cstr->gen;
+			cstr->last_hit = it;
 
 			/* Return from cache */
-			b->ptr = it->data + (b->offs - it->offs);
-			return 1;
+			return it->data + (offs - it->offs);
 		}
 		if (!it->len)
 			unused = it;
 		else if (it->gen < best->gen)
 			best = it;
 		if (++it == endp)
-			it = rst->page;
-	} while (it != rst->last_hit);
+			it = cstr->page;
+	} while (it != cstr->last_hit);
 
 	/* Not found in cache, will read into |unused| or |best| */
 	if (unused)
@@ -221,24 +208,140 @@ fmdp_read(struct FmdReadState *rst,
 
 	/* XXX: align read to optimal block size, if possible */
 	/* XXX: align read not to include already cached page */
-	off_t offs = lseek(rst->fd, b->offs, SEEK_SET);
-	if (offs == -1)
-		return -1;
+	const uint8_t *ptr =
+		cstr->next->get(cstr->next, offs, FMDP_READ_PAGE_SZ);
+	if (!ptr)
+		return 0;
 
-	ssize_t len = read(rst->fd, best->data, FMDP_READ_PAGE_SZ);
-	if (len == -1)
-		return -1;
+	memcpy(best->data, ptr, FMDP_READ_PAGE_SZ);
 	best->offs = offs;
-	best->len = len;
+	best->len = FMDP_READ_PAGE_SZ;
 	best->hits = 1;
-	best->gen = ++rst->gen;
-	rst->last_hit = best;
+	best->gen = ++cstr->gen;
+	cstr->last_hit = best;
 
-	assert(b->offs >= best->offs);
-	b->ptr = best->data + (b->offs - best->offs);
-	if (best->len < b->len)
-		b->len = best->len;
-	return b->len > 0;
+	assert(offs >= best->offs);
+	return best->data + (offs - best->offs);
+}
+
+
+static void
+fmdp_cached_stream_close(struct FmdStream *stream)
+{
+	assert(stream);
+
+	struct FmdCachedStream *cstr = FMDP_GET_CSTR(stream);
+	cstr->next->close(cstr->next);
+	free(cstr);
+}
+
+struct FmdStream*
+fmdp_cache_stream(struct FmdStream *stream)
+{
+	assert(stream);
+
+	struct FmdCachedStream *cstr =
+		(struct FmdCachedStream*)calloc(1, sizeof *cstr);
+	if (cstr) {
+		cstr->base.get = &fmdp_cached_stream_get;
+		cstr->base.close = &fmdp_cached_stream_close;
+		cstr->base.file = stream->file;
+		cstr->next = stream;
+		cstr->last_hit = cstr->page;
+		stream = &cstr->base;
+	}
+	/* Cannot allocate memory -> return original |stream| */
+	return stream;
+}
+
+
+struct FmdFileStream {
+	struct FmdStream base;
+	int fd;
+
+	off_t offs;
+	size_t len;
+	uint8_t buf[FMDP_READ_PAGE_SZ];
+};
+#define FMDP_GET_FSTR(_stream)			\
+	(struct FmdFileStream*)((_stream) - offsetof(struct FmdFileStream, base))
+
+static const uint8_t*
+fmdp_file_stream_get(struct FmdStream *stream,
+		     off_t offs, size_t len)
+{
+	assert(stream);
+	assert(len);
+
+	struct FmdFileStream *fstr = FMDP_GET_FSTR(stream);
+
+	if (fstr->offs <= offs &&
+	    fstr->offs + fstr->len >= offs + len) {
+		/* Return from cache */
+		return fstr->buf + (offs - fstr->offs);
+	}
+
+	/* XXX: align if requested size is smaller than page size */
+	off_t realoffs = lseek(fstr->fd, offs, SEEK_SET);
+	if (realoffs == -1)
+		return 0;
+	if (realoffs != offs) {
+		errno = ENOTRECOVERABLE;
+		return 0;
+	}
+
+	ssize_t reallen = read(fstr->fd, fstr->buf, FMDP_READ_PAGE_SZ);
+	if (reallen == -1)
+		return 0;
+	fstr->offs = realoffs;
+	fstr->len = reallen;
+	if (reallen < (ssize_t)len) {
+		errno = ERANGE;
+		return 0;
+	}
+
+	return fstr->buf + (offs - fstr->offs);
+}
+
+static void
+fmdp_file_stream_close(struct FmdStream *stream)
+{
+	assert(stream);
+
+	struct FmdFileStream *fstr = FMDP_GET_FSTR(stream);
+	close(fstr->fd);
+	free(fstr);
+}
+
+struct FmdStream*
+fmdp_open_file(int dirfd, struct FmdFile *file, int cached)
+{
+	assert(file);
+
+	struct FmdFileStream *fstr =
+		(struct FmdFileStream*)calloc(1, sizeof *fstr);
+	if (!fstr)
+		return 0;
+
+	fstr->base.get = &fmdp_file_stream_get;
+	fstr->base.close = &fmdp_file_stream_close;
+	fstr->base.file = file;
+	fstr->fd = openat(dirfd, dirfd != AT_FDCWD ? file->name : file->path,
+			  O_RDONLY);
+	if (fstr->fd == -1) {
+		free(fstr);
+		return 0;
+	}
+
+	/* Issue a request to read file header */
+	struct FmdStream *res = &fstr->base;
+	if (cached) {
+		struct FmdStream *c = fmdp_cache_stream(res);
+		if (c)
+			res = c;
+	}
+	(void)fmdp_file_stream_get(res, 0, FMDP_READ_PAGE_SZ);
+	return res;
 }
 
 
@@ -282,23 +385,27 @@ fmdp_probe_file(int dirfd, struct FmdFile *info)
 {
 	assert(info);
 
-	struct FmdReadState *rst = fmdp_open(dirfd, info);
-	if (!rst)
+	/* File should have minimum length in order to probe it */
+	if (info->stat.st_size < 256)
+		return 0;
+
+	struct FmdStream *stream = fmdp_open_file(dirfd, info, /*cache*/1);
+	if (!stream)
 		return -1;
 
-	/* Attempt to deduce file type from header magic */
-	/* XXX: Replace with some sort of a table to be iterated */
-	struct FmdBlock hdr = { 0, 0, FMDP_READ_PAGE_SZ };
-	int res = fmdp_read(rst, &hdr);
-	if (res == 1) {
-		assert(hdr.ptr);
-		if (hdr.len > 4 &&
-		    !memcmp(hdr.ptr, "fLaC", 4) &&
-		    fmdp_do_flac(rst) == 0)
+	size_t len = FMDP_READ_PAGE_SZ;
+	if ((off_t)len > stream->file->stat.st_size)
+		len = (size_t)stream->file->stat.st_size;
+	const uint8_t *p = stream->get(stream, 0, len);
+	if (p) {
+		/* Attempt to deduce file type from header magic */
+		/* XXX: Replace with some sort of a table to be iterated */
+		if (!memcmp(p, "fLaC", 4) &&
+		    fmdp_do_flac(stream) == 0)
 			goto end;
 	}
 
 end:
-	fmdp_close(rst);
+	stream->close(stream);
 	return 0;
 }

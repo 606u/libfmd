@@ -4,10 +4,10 @@
 #include <limits.h>
 
 static int
-fmdp_do_flac_stream_info(struct FmdReadState *rst,
+fmdp_do_flac_stream_info(struct FmdStream *stream,
 			 const uint8_t *si)
 {
-	assert(rst);
+	assert(stream);
 	assert(si);
 
 	/* Stream info follows strict layout */
@@ -17,7 +17,7 @@ fmdp_do_flac_stream_info(struct FmdReadState *rst,
 	/* XXX: 36 bits could overflow 32-bit long */
 	long total_samples = fmdp_get_bits_be(si, 80 + 20 + 3 + 5, 36);
 
-	struct FmdFile *file = rst->file;
+	struct FmdFile *file = stream->file;
 	int res = fmdp_add_n(file, fmdet_sampling_rate, sample_rate);
 	if (!res)
 		res = fmdp_add_n(file, fmdet_num_channels, channels);
@@ -70,10 +70,10 @@ fmdp_do_vorbis_md_field(struct FmdFile *file,
 
 /* Handles Ogg Vorbis comments section */
 static int
-fmdp_do_vorbis_comments(struct FmdReadState *rst,
+fmdp_do_vorbis_comments(struct FmdStream *stream,
 			const uint8_t *comment, size_t len)
 {
-	assert(rst);
+	assert(stream);
 	assert(comment);
 	assert(len);
 
@@ -82,6 +82,7 @@ fmdp_do_vorbis_comments(struct FmdReadState *rst,
 
 	/* Spec: https://xiph.org/vorbis/doc/v-comment.html */
 	/* All lengths are 32-bit little-endian; text is in UTF-8 */
+	struct FmdFile *file = stream->file;
 	const uint8_t *p = comment, *endp = p + len;
 #define FMDP_GET_LE32(_p)						\
 	((_p)[0] | ((size_t)(_p)[1] << 8) | ((size_t)(_p)[2] << 16) |	\
@@ -89,7 +90,7 @@ fmdp_do_vorbis_comments(struct FmdReadState *rst,
 	size_t n = FMDP_GET_LE32 (p); p += 4;
 	if (p + n > endp)
 		return 0;
-	int res = fmdp_add_text(rst->file, fmdet_creator, (const char*)p, n);
+	int res = fmdp_add_text(file, fmdet_creator, (const char*)p, n);
 	if (res)
 		return res;
 	p += n;
@@ -103,7 +104,7 @@ fmdp_do_vorbis_comments(struct FmdReadState *rst,
 		while (eq < endp && *eq != '=')
 			++eq;
 		if (eq != endp) {
-			res = fmdp_do_vorbis_md_field(rst->file,
+			res = fmdp_do_vorbis_md_field(file,
 						      (const char*)p,
 						      eq - p,
 						      (const char*)eq + 1,
@@ -118,20 +119,21 @@ fmdp_do_vorbis_comments(struct FmdReadState *rst,
 
 
 int
-fmdp_do_flac(struct FmdReadState *rst)
+fmdp_do_flac(struct FmdStream *stream)
 {
-	assert(rst);
+	assert(stream);
 
 	/* Format spec: https://xiph.org/flac/format.html#stream */
-	struct FmdBlock hdr = { 0, 0, FMDP_READ_PAGE_SZ };
-	int res = fmdp_read(rst, &hdr);
-	if (res < 1)
-		return res;
+	size_t len = FMDP_READ_PAGE_SZ;
+	if ((off_t)len > stream->file->stat.st_size)
+		len = (size_t)stream->file->stat.st_size;
+	const uint8_t *p = stream->get(stream, 0, len);
+	if (!p)
+		return -1;
 
 	/* Be lazy and expect all the metadata to fit in the first
 	 * page */
-	const uint8_t *p = hdr.ptr, *endp = p + hdr.len;
-	assert(p);
+	const uint8_t *endp = p + len;
 	p += 4;			/* fLaC */
 	/* Iterate over metadata blocks */
 	int last = 0;
@@ -144,18 +146,18 @@ fmdp_do_flac(struct FmdReadState *rst)
 			if (block_type == 0 &&
 			    block_len == 34)
 				/* stream info */
-				fmdp_do_flac_stream_info(rst, payload);
+				fmdp_do_flac_stream_info(stream, payload);
 			else if (block_type == 4 &&
 				 block_len >= 8)
 				/* vorbis comment */
-				fmdp_do_vorbis_comments(rst, payload,
+				fmdp_do_vorbis_comments(stream, payload,
 							block_len);
 		}
 		p += 4 + block_len;
 	}
 
-	rst->file->filetype = fmdft_audio;
-	rst->file->mimetype = "audio/flac";
+	stream->file->filetype = fmdft_audio;
+	stream->file->mimetype = "audio/flac";
 
 	return 0;
 }
