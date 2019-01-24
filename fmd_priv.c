@@ -122,7 +122,7 @@ fmdp_add_unicodewbom(struct FmdFile *file,
 		 * string and convert */
 		struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_text, b);
 		if (elem) {
-			uint8_t *o = elem->text;
+			uint8_t *o = (uint8_t*)elem->text;
 			for (p = s; p != endp; p += 2) {
 				uint16_t c = ((uint16_t)p[1] << 8) + p[0];
 				if (c <= 0x7f)
@@ -154,7 +154,7 @@ fmdp_add_unicodewbom(struct FmdFile *file,
 
 		struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_text, b);
 		if (elem) {
-			uint8_t *o = elem->text;
+			uint8_t *o = (uint8_t*)elem->text;
 			for (p = s; p != endp; p += 2) {
 				uint16_t c = ((uint16_t)p[0] << 8) + p[1];
 				if (c <= 0x7f)
