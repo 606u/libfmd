@@ -90,6 +90,92 @@ fmdp_add_text(struct FmdFile *file,
 
 }
 
+int
+fmdp_add_unicodewbom(struct FmdFile *file,
+		     enum FmdElemType elemtype, const uint8_t *s, int len)
+{
+	assert(file);
+	assert(s);
+	assert(len > 0);
+	assert((len % 2) == 0);
+
+	if (len < 2 || (len % 2) != 0)
+		return (errno = EINVAL), -1;
+
+	/* Unicode BOM */
+	const uint8_t *p, *endp = s + len;
+	if (s[0] == 0xff && s[1] == 0xfe) { /* big-endian */
+		/* Iterate over Big Endian Unicode string to calculate
+		 * the # of bytes needed to convert to UTF-8 */
+		size_t b = 0;
+		for (p = s; p != endp; p += 2) {
+			uint16_t c = ((uint16_t)p[1] << 8) + p[0];
+			if (c <= 0x7f)
+				++b;
+			else if (c <= 0x7ff)
+				b += 2;
+			else
+				b += 3;
+		}
+
+		/* Allocate field large enough to fit resulted UTF-8
+		 * string and convert */
+		struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_text, b);
+		if (elem) {
+			uint8_t *o = elem->text;
+			for (p = s; p != endp; p += 2) {
+				uint16_t c = ((uint16_t)p[1] << 8) + p[0];
+				if (c <= 0x7f)
+					*o++ = (uint8_t)c;
+				else if (c <= 0x7ff) {
+					*o++ = 0xc0 | (uint8_t)(c >> 6);
+					*o++ = 0x80 | (uint8_t)(c & 0x3f);
+				} else {
+					*o++ = 0xe0 | (uint8_t)(c >> 12);
+					*o++ = 0x80 | (uint8_t)((c >> 6) & 0x3f);
+					*o++ = 0x80 | (uint8_t)(c & 0x3f);
+				}
+			}
+			*o = '\0';
+			return 0;
+		}
+
+	} else if (s[0] == 0xfe && s[1] == 0xff) { /* little-endian */
+		size_t b = 0;
+		for (p = s; p != endp; p += 2) {
+			uint16_t c = ((uint16_t)p[0] << 8) + p[1];
+			if (c <= 0x7f)
+				++b;
+			else if (c <= 0x7ff)
+				b += 2;
+			else
+				b += 3;
+		}
+
+		struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_text, b);
+		if (elem) {
+			uint8_t *o = elem->text;
+			for (p = s; p != endp; p += 2) {
+				uint16_t c = ((uint16_t)p[0] << 8) + p[1];
+				if (c <= 0x7f)
+					*o++ = (uint8_t)c;
+				else if (c <= 0x7ff) {
+					*o++ = 0xc0 | (uint8_t)(c >> 6);
+					*o++ = 0x80 | (uint8_t)(c & 0x3f);
+				} else {
+					*o++ = 0xe0 | (uint8_t)(c >> 12);
+					*o++ = 0x80 | (uint8_t)((c >> 6) & 0x3f);
+					*o++ = 0x80 | (uint8_t)(c & 0x3f);
+				}
+			}
+			*o = '\0';
+			return 0;
+		}
+	} else
+		return (errno = EINVAL), -1;
+	return -1;		/* out-of-memory */
+}
+
 
 long
 fmdp_parse_decimal(const char *text, size_t len)
@@ -125,13 +211,49 @@ fmdp_caseless_match(const char *text, size_t len,
 
 
 int
+fmdp_case_match(const char *text, size_t len,
+		const char *token)
+{
+	assert(text);
+	assert(len);
+	assert(token);
+
+	const char *p = text, *endp = text + len;
+	while (p != endp && *p == *token)
+		++p, ++token;
+	return p == endp && !*token;
+}
+
+
+int
 fmdp_match_token(const char *text, size_t len,
 		 const struct FmdToken *tokens)
 {
+	assert(text);
+	assert(len);
+	assert(tokens);
+
 	const struct FmdToken *it;
 	for (it = tokens; it->name; ++it)
 		if (fmdp_caseless_match(text, len, it->name))
 			return it->value;
+	return -1;
+}
+
+
+int
+fmdp_match_token_exact(const char *text, size_t len,
+		       const struct FmdToken *tokens)
+{
+	assert(text);
+	assert(len);
+	assert(tokens);
+
+	const struct FmdToken *it;
+	for (it = tokens; it->name; ++it) {
+		if (fmdp_case_match(text, len, it->name))
+			return it->value;
+	}
 	return -1;
 }
 
@@ -402,6 +524,11 @@ fmdp_probe_file(int dirfd, struct FmdFile *info)
 		/* XXX: Replace with some sort of a table to be iterated */
 		if (!memcmp(p, "fLaC", 4) &&
 		    fmdp_do_flac(stream) == 0)
+			goto end;
+		if (p[0] == 'I' && p[1] == 'D' && p[2] == '3' &&
+		    p[3] < 0xff && p[4] < 0xff &&
+		    p[6] < 0x80 && p[7] < 0x80 && p[8] < 0x80 && p[9] < 0x80 &&
+		    fmdp_do_mp3v2(stream) == 0)
 			goto end;
 	}
 

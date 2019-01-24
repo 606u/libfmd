@@ -20,6 +20,9 @@ int fmdp_add_timestamp(struct FmdFile *file,
 		       enum FmdElemType elemtype, time_t value);
 int fmdp_add_text(struct FmdFile *file,
 		  enum FmdElemType elemtype, const char *s, int len);
+/* Adds text with Unicode BOM (byte-order mark) */
+int fmdp_add_unicodewbom(struct FmdFile *file,
+			 enum FmdElemType elemtype, const uint8_t *s, int len);
 
 /* Parses text to a decimal; returns LONG_MIN on error */
 long fmdp_parse_decimal(const char *text, size_t len);
@@ -28,6 +31,9 @@ long fmdp_parse_decimal(const char *text, size_t len);
  * given lowercase) */
 int fmdp_caseless_match(const char *text, size_t len,
 			const char *token);
+/* Same as |fmdp_caseless_match()| except comparison is exact */
+int fmdp_case_match(const char *text, size_t len,
+		    const char *token);
 
 struct FmdToken {
 	const char *name;
@@ -37,6 +43,9 @@ struct FmdToken {
  * -1; trailing token should be { 0, 0 } */
 int fmdp_match_token(const char *text, size_t len,
 		     const struct FmdToken *tokens);
+/* Same as |fmdp_match_token()| except comparison is not case-less */
+int fmdp_match_token_exact(const char *text, size_t len,
+			   const struct FmdToken *tokens);
 
 struct FmdStream {
 	/* Reads |len| bytes from |stream|, starting at |offs|, and
@@ -66,6 +75,37 @@ long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
 
 int fmdp_probe_file(int dirfd, struct FmdFile *info);
 
+/* Reads 1st page or whole file, whatever is less, defines |len|, |p|
+ * and |endp|; returns -1 on failure to do so */
+#  define FMDP_READ1STPAGE(_stream, _failrv)			\
+	size_t len = FMDP_READ_PAGE_SZ;				\
+	if ((off_t)len > stream->file->stat.st_size)		\
+		len = (size_t)stream->file->stat.st_size;	\
+	const uint8_t *p = stream->get(stream, 0, len);		\
+	if (!p)							\
+		return (_failrv);				\
+	const uint8_t *endp = p + len;				\
+	(void)endp
+
 int fmdp_do_flac(struct FmdStream *stream);
+int fmdp_do_mp3v2(struct FmdStream *stream);
+
+/* Interface to iterate over stream frames (i.e. over ID3v2 or OGG
+ * frames) */
+struct FmdFrame {
+	size_t typelen, datalen;
+	const uint8_t *type;
+	const uint8_t *data;	/* 0, unless read */
+};
+struct FmdFrameIterator {
+	const struct FmdFrame* (*curr)(struct FmdFrameIterator *iter);
+	/* Positions at 1st/next frame and fillss |type/len| and
+	 * |datalen|; returns 1 on success, 0 if no next frame, or -1
+	 * on error */
+	int (*next)(struct FmdFrameIterator *iter);
+	/* Reads |data/len| at current frame */
+	int (*read)(struct FmdFrameIterator *iter);
+	void (*free)(struct FmdFrameIterator *iter);
+};
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */
