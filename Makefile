@@ -1,6 +1,12 @@
 
 CFLAGS = -Wall -Wextra
 
+build ?= debug
+buildflags = $(build)
+buildflags := $(buildflags:debug=-D_DEBUG -O0)
+buildflags := $(buildflags:release=-DNDEBUG -O2)
+CFLAGS += $(buildflags)
+
 libfmd_sources = fmd.c fmd_priv.c fmd_audio.c
 libfmd_objects = $(libfmd_sources:.c=.o)
 libfmd_so = libfmd.so.0
