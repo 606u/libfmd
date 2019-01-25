@@ -164,7 +164,6 @@ fmdp_do_flac(struct FmdStream *stream)
 struct FmdID3v2FrameIterator {
 	struct FmdFrameIterator base;
 
-	struct FmdStream *stream;
 	/* Current ID3v2 frame offset, initially 0. Incremented with
 	 * |frame_size| when ..._next() is called */
 	off_t offs;
@@ -195,8 +194,8 @@ fmdp_id3v234frit_next(struct FmdFrameIterator *iter)
 		return 0;
 
 	/* Frame header: 4-byte frame-id, 4-byte size, 2-byte flags */
-	const uint8_t *p = id3it->stream->get(id3it->stream, id3it->offs,
-					      FMDP_ID3V234_FRHDR_SZ);
+	const uint8_t *p = iter->stream->get(iter->stream, id3it->offs,
+					     FMDP_ID3V234_FRHDR_SZ);
 	if (!p)
 		return -1;
 
@@ -219,7 +218,7 @@ fmdp_id3v234frit_read(struct FmdFrameIterator *iter)
 	if (offs + (off_t)len > id3it->endoffs)
 		return 0;
 
-	const uint8_t *p = id3it->stream->get(id3it->stream, offs, len);
+	const uint8_t *p = iter->stream->get(iter->stream, offs, len);
 	if (p) {
 		id3it->base.data = p;
 		return 0;
@@ -261,7 +260,7 @@ fmdp_id3frit_create(struct FmdStream *stream)
 	/* XXX: _part() */
 	id3it->base.free = &fmdp_id3frit_free;
 
-	id3it->stream = stream;
+	id3it->base.stream = stream;
 
 	/* Those two are const: frame id is always 4 bytes; bytes in
 	 * |id3it->frame_id| are changed from ..._next() */

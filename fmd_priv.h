@@ -101,6 +101,8 @@ struct FmdFrameIterator {
 
 	void (*free)(struct FmdFrameIterator *iter);
 
+	struct FmdStream *stream;
+
 	size_t typelen, datalen;
 	const uint8_t *type;	/* 0, unless next() called */
 	const uint8_t *data;	/* 0, unless read() called */
