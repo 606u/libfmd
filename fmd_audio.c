@@ -171,8 +171,6 @@ struct FmdID3v2FrameIterator {
 	/* Offset of last ID3v2 header byte */
 	off_t endoffs;
 
-	struct FmdFrame frame;
-
 	/* A copy of current frame's frame_id; |frame.type| also
 	 * points here and |frame.typelen| is set in ..._create() */
 	uint8_t frame_id[4 + 1];
@@ -182,18 +180,6 @@ struct FmdID3v2FrameIterator {
 };
 #define GET_ID3V2(_iter)			\
 	(struct FmdID3v2FrameIterator*)((char*)(_iter) - offsetof (struct FmdID3v2FrameIterator, base))
-static const struct FmdFrame*
-fmdp_id3frit_curr(struct FmdFrameIterator *iter)
-{
-	assert(iter);
-	if (!iter)
-		return 0;
-
-	struct FmdID3v2FrameIterator *id3it = GET_ID3V2(iter);
-	if (id3it->offs)
-		return &id3it->frame;
-	return 0;		/* _next() not yet called */
-}
 
 static int
 fmdp_id3v234frit_next(struct FmdFrameIterator *iter)
@@ -215,8 +201,8 @@ fmdp_id3v234frit_next(struct FmdFrameIterator *iter)
 		return -1;
 
 	memcpy(id3it->frame_id, p, 4);
-	id3it->frame.datalen = fmdp_get_bits_be(p, 4 * 8, 32);
-	id3it->frame_size = FMDP_ID3V234_FRHDR_SZ + id3it->frame.datalen;
+	id3it->base.datalen = fmdp_get_bits_be(p, 4 * 8, 32);
+	id3it->frame_size = FMDP_ID3V234_FRHDR_SZ + id3it->base.datalen;
 	return 1;
 }
 
@@ -229,13 +215,13 @@ fmdp_id3v234frit_read(struct FmdFrameIterator *iter)
 
 	struct FmdID3v2FrameIterator *id3it = GET_ID3V2(iter);
 	const off_t offs = id3it->offs + FMDP_ID3V234_FRHDR_SZ;
-	const size_t len = id3it->frame.datalen;
+	const size_t len = id3it->base.datalen;
 	if (offs + (off_t)len > id3it->endoffs)
 		return 0;
 
 	const uint8_t *p = id3it->stream->get(id3it->stream, offs, len);
 	if (p) {
-		id3it->frame.data = p;
+		id3it->base.data = p;
 		return 0;
 	}
 	return -1;
@@ -270,17 +256,17 @@ fmdp_id3frit_create(struct FmdStream *stream)
 	if (!id3it)
 		return 0;
 
-	id3it->base.curr = &fmdp_id3frit_curr;
 	id3it->base.next = &fmdp_id3v234frit_next;
 	id3it->base.read = &fmdp_id3v234frit_read;
+	/* XXX: _part() */
 	id3it->base.free = &fmdp_id3frit_free;
 
 	id3it->stream = stream;
 
 	/* Those two are const: frame id is always 4 bytes; bytes in
 	 * |id3it->frame_id| are changed from ..._next() */
-	id3it->frame.type = id3it->frame_id;
-	id3it->frame.typelen = 4;
+	id3it->base.type = id3it->frame_id;
+	id3it->base.typelen = 4;
 
 	id3it->offs = 0;
 	id3it->frame_size = 10; /* len of ID3v2 tag header */
@@ -295,12 +281,10 @@ fmdp_id3frit_create(struct FmdStream *stream)
 
 static int
 fmdp_do_id3_md_field(struct FmdFile *file,
-		     struct FmdFrameIterator *iter,
-		     const struct FmdFrame *frame)
+		     struct FmdFrameIterator *iter)
 {
 	assert(file);
 	assert(iter);
-	assert(frame);
 
 	static const struct FmdToken id3_fields[] = {
 		{ "TIT2", fmdet_title },
@@ -315,15 +299,15 @@ fmdp_do_id3_md_field(struct FmdFile *file,
 		{ "TSRC", fmdet_isrc },
 		{ 0, 0 }
 	};
-	int t = fmdp_match_token_exact((const char*)frame->type,
-				       frame->typelen, id3_fields);
+	int t = fmdp_match_token_exact((const char*)iter->type,
+				       iter->typelen, id3_fields);
 	if (t == -1)
 		return 0;	/* no match found */
 	if (iter->read(iter) == -1)
 		return -1;	/* Can't read frame data */
-	assert(frame->data);
-	const char *value = (const char*)frame->data;
-	const size_t value_len = frame->datalen;
+	assert(iter->data);
+	const char *value = (const char*)iter->data;
+	const size_t value_len = iter->datalen;
 	if (t == fmdet_trackno) {
 		long n = fmdp_parse_decimal(value, value_len);
 		if (n != LONG_MIN)
@@ -357,8 +341,7 @@ fmdp_do_mp3v2(struct FmdStream *stream)
 		return -1;
 
 	while (iter->next(iter)) {
-		const struct FmdFrame *frame = iter->curr(iter);
-		fmdp_do_id3_md_field(stream->file, iter, frame);
+		fmdp_do_id3_md_field(stream->file, iter);
 	}
 
 	iter->free(iter);

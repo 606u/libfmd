@@ -87,25 +87,26 @@ int fmdp_probe_file(int dirfd, struct FmdFile *info);
 	const uint8_t *endp = p + len;				\
 	(void)endp
 
-int fmdp_do_flac(struct FmdStream *stream);
-int fmdp_do_mp3v2(struct FmdStream *stream);
-
 /* Interface to iterate over stream frames (i.e. over ID3v2 or OGG
  * frames) */
-struct FmdFrame {
-	size_t typelen, datalen;
-	const uint8_t *type;
-	const uint8_t *data;	/* 0, unless read */
-};
 struct FmdFrameIterator {
-	const struct FmdFrame* (*curr)(struct FmdFrameIterator *iter);
-	/* Positions at 1st/next frame and fillss |type/len| and
+	/* Positions at 1st/next frame and fills |type/len| and
 	 * |datalen|; returns 1 on success, 0 if no next frame, or -1
 	 * on error */
 	int (*next)(struct FmdFrameIterator *iter);
-	/* Reads |data/len| at current frame */
+
+	/* Reads whole current frame, fills |data/len|. Frame size
+	 * should not be larger than FMDP_READ_PAGE_SZ */
 	int (*read)(struct FmdFrameIterator *iter);
+
 	void (*free)(struct FmdFrameIterator *iter);
+
+	size_t typelen, datalen;
+	const uint8_t *type;	/* 0, unless next() called */
+	const uint8_t *data;	/* 0, unless read() called */
 };
+
+int fmdp_do_flac(struct FmdStream *stream);
+int fmdp_do_mp3v2(struct FmdStream *stream);
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */
