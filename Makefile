@@ -30,6 +30,7 @@ $(libfmd_so): $(libfmd_objects)
 $(libfmd_a): $(libfmd_objects)
 	$(AR) crs $@ $(libfmd_objects)
 
+fmdscan.o: fmd.h
 fmd.o: fmd.c fmd.h fmd_priv.h
 fmd_priv.o: fmd_priv.c fmd.h fmd_priv.h
 fmd_audio.o: fmd_audio.c fmd.h fmd_priv.h

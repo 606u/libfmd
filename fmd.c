@@ -56,6 +56,8 @@ fmd_print_elem(const struct FmdElem *elem,
 {
 	assert(elem);
 	assert(where);
+	if (!elem || !where)
+		return;
 
 	assert(elem->elemtype < sizeof(fmd_elemtype) / sizeof(fmd_elemtype[0]));
 	const char *name = fmd_elemtype[elem->elemtype];
@@ -91,6 +93,8 @@ fmd_print_file(const struct FmdFile *file,
 {
 	assert(file);
 	assert(where);
+	if (!file || !where)
+		return;
 
 	fprintf(where, "%s (%s)\n", file->path, file->name);
 	assert(file->filetype < sizeof(fmd_filetype) / sizeof(fmd_filetype[0]));
@@ -127,19 +131,25 @@ fmd_print_file(const struct FmdFile *file,
 
 
 static int
-fmd_scan_file(int dirfd,
+fmd_scan_file(struct FmdScanJob *job,
+	      int dirfd,
 	      const char *path,
-	      enum FmdScanFlags flags,
 	      struct FmdFile **info)
 {
+	assert(job);
 	assert(path);
 	assert(info);
+	if (!job || !path || !info)
+		return (errno = EINVAL), -1;
 
 	size_t path_len = strlen(path);
 	size_t sz = sizeof(struct FmdFile) + path_len;
 	struct FmdFile *file = (struct FmdFile*)calloc(1, sz);
-	if (!file)
+	if (!file) {
+		job->log(job, path, fmdlt_oserr, "%s(%u): %s",
+			 "calloc", (unsigned)sz, strerror(ENOMEM));
 		return -1;	/* errno should be ENOMEM */
+	}
 
 	strcpy(file->path, path);
 	file->name = strrchr(file->path, '/');
@@ -149,6 +159,8 @@ fmd_scan_file(int dirfd,
 	int res = fstatat(dirfd, dirfd != AT_FDCWD ? file->name : file->path,
 			  &file->stat, stflags);
 	if (res != 0) {
+		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
+			 "fstatat", path, strerror(errno));
 		free(file);
 		return res;
 	}
@@ -159,33 +171,45 @@ fmd_scan_file(int dirfd,
 	else
 		file->filetype = fmdft_directory;
 	*info = file;
-	if (!is_dir && (flags & fmdsf_metadata) == fmdsf_metadata)
-		return fmdp_probe_file(dirfd, file), 0;
+	if (!is_dir && (job->flags & fmdsf_metadata) == fmdsf_metadata)
+		return fmdp_probe_file(job, dirfd, file), 0;
 	return 0;
 }
 
 
 static int
-fmd_scan_hier(int parent_dirfd,
+fmd_scan_hier(struct FmdScanJob *job,
+	      int parent_dirfd,
 	      const char *path,
-	      enum FmdScanFlags flags,
 	      struct FmdFile **info)
 {
+	assert(job);
 	assert(path);
 	assert(info);
+	if (!job || !path || !info)
+		return (errno = EINVAL), -1;
 
 	/* XXX: add up statistics to keep track of errors */
 
 	enum { fullpath_sz = 2048 };
 	const size_t path_len = strlen(path) + 1;
-	if (path_len + 10 > fullpath_sz)
-		return errno = ENAMETOOLONG, -1;
+	if (path_len + 10 > fullpath_sz) {
+		errno = ENAMETOOLONG;
+		job->log(job, path, fmdlt_use, "%s(%s): %s",
+			 "path", path, strerror(errno));
+		return -1;
+	}
 
 	int dirfd = openat(parent_dirfd, path, O_RDONLY | O_DIRECTORY);
-	if (dirfd == -1)
+	if (dirfd == -1) {
+		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
+			 "openat", path, strerror(errno));
 		return -1;
+	}
 	DIR *dirp = fdopendir(dirfd);
 	if (!dirp) {
+		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
+			 "fdopendir", path, strerror(errno));
 		close(dirfd);	/* could lose errno */
 		return -1;
 	}
@@ -210,7 +234,7 @@ fmd_scan_hier(int parent_dirfd,
 
 			struct FmdFile *file = 0;
 			strcpy(fullpath + path_len, entry->d_name);
-			int res = fmd_scan_file(dirfd, fullpath, flags, &file);
+			int res = fmd_scan_file(job, dirfd, fullpath, &file);
 			if (!res && file) {
 				if (tail)
 					tail->next = file;
@@ -228,7 +252,7 @@ fmd_scan_hier(int parent_dirfd,
 		if (it->filetype == fmdft_directory &&
 		    it->name[0] != '.') {
 			struct FmdFile *children = 0;
-			int res = fmd_scan_hier(dirfd, it->name, flags,
+			int res = fmd_scan_hier(job, dirfd, it->name,
 						&children);
 			if (!res && children) {
 				/* Insert children right after
@@ -252,17 +276,37 @@ fmd_scan_hier(int parent_dirfd,
 }
 
 
-int
-fmd_scan(const char *location,
-	 enum FmdScanFlags flags,
-	 struct FmdFile **info)
+static void
+fmd_dummy_log(struct FmdScanJob *job,
+	      const char *path,
+	      enum FmdLogType lt,
+	      const char *fmt, ...)
 {
-	assert(location);
-	assert(info);
+	assert(job);
+	assert(path);
+	(void)lt;
+	assert(fmt);
+}
 
-	if ((flags & fmdsf_recursive) != fmdsf_recursive)
-		return fmd_scan_file(AT_FDCWD, location, flags, info);
-	return fmd_scan_hier(AT_FDCWD, location, flags, info);
+
+int
+fmd_scan(struct FmdScanJob *job)
+{
+	assert(job);
+	assert(job->location);
+	if (!job || !job->location)
+		return (errno = EINVAL), -1;
+
+	if (!job->log)
+		/* Ensure |job->log| is always available. That would
+		 * make code down further simpler, as a test, whether
+		 * |log| is assigned, can be avoided everywhere */
+		job->log = &fmd_dummy_log;
+
+	if ((job->flags & fmdsf_recursive) != fmdsf_recursive)
+		return fmd_scan_file(job, AT_FDCWD, job->location,
+				     &job->first_file);
+	return fmd_scan_hier(job, AT_FDCWD, job->location, &job->first_file);
 }
 
 

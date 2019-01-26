@@ -16,6 +16,13 @@ enum FmdScanFlags {
 	fmdsf_archives = 1 << 2
 };
 
+enum FmdLogType {
+	fmdlt_trace,  /* Generic debug message */
+	fmdlt_format, /* Some sort of parse error or corrupted file */
+	fmdlt_oserr,  /* OS-reported error, like I/O or perm */
+	fmdlt_use     /* Error, related to libfmd usage */
+};
+
 /* XXX: Consult RFC5013: The Dublin Core Metadata Element Set */
 enum FmdFileType {
 	fmdft_file,
@@ -84,19 +91,34 @@ struct FmdFile {
 	char *name, path[1];
 };
 
-struct FmdCallback {
-	int (*begin)(struct FmdCallback *cb, const char *path);
-	int (*finish)(struct FmdCallback *cb, struct FmdFile *info);
+struct FmdScanJob {
+	const char *location;
+	enum FmdScanFlags flags;
+
+	/* fmd_scan() will fill this upon successful completion. Shall
+	 * be freed with fmd_free() */
+	struct FmdFile *first_file;
+
+	/* Hooks: */
+	/* For logging. fmd_scan() will assign a dummy hook if |log|
+	 * is null to avoid a test before each invocation */
+	void (*log)(struct FmdScanJob *job,
+		    const char *path,
+		    enum FmdLogType lt,
+		    const char *fmt, ...);
+
+	/* Called when starting to scan file. Will skip scanning
+	 * |path| if hook is assigned and returns non-zero */
+	int (*begin)(struct FmdScanJob *job, const char *path);
+	/* Called when finished with scanning file. Will not add
+	 * |file| to the chain if hook is assigned and returns
+	 * non-zero */
+	int (*finish)(struct FmdScanJob *job, struct FmdFile *file);
 };
 
-/* Read metadata */
-int fmd_scan(const char *location,
-	     enum FmdScanFlags flags,
-	     struct FmdFile **info);
-int fmd_scan2(const char *location,
-	      enum FmdScanFlags flags,
-	      struct FmdCallback *cb,
-	      struct FmdFile **info);
+/* Read metadata from a file or a directory tree at |job->location|,
+ * considering |job->flags| */
+int fmd_scan(struct FmdScanJob *job);
 
 void fmd_free(struct FmdFile *item);
 void fmd_free_chain(struct FmdFile *head);

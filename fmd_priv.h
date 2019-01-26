@@ -66,6 +66,7 @@ struct FmdStream {
 	/* Closes given |stream| */
 	void (*close)(struct FmdStream *stream);
 
+	struct FmdScanJob *job;
 	struct FmdFile *file;
 };
 struct FmdStream* fmdp_open_file(int dirfd, struct FmdFile *file, int cached);
@@ -73,7 +74,7 @@ struct FmdStream* fmdp_open_file(int dirfd, struct FmdFile *file, int cached);
 /* Returns |len| big-endian bits from |offs|, also in bits */
 long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
 
-int fmdp_probe_file(int dirfd, struct FmdFile *info);
+int fmdp_probe_file(struct FmdScanJob *job, int dirfd, struct FmdFile *info);
 
 /* Reads 1st page or whole file, whatever is less, defines |len|, |p|
  * and |endp|; returns -1 on failure to do so */

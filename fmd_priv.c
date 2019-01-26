@@ -503,17 +503,26 @@ fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len)
 
 
 int
-fmdp_probe_file(int dirfd, struct FmdFile *info)
+fmdp_probe_file(struct FmdScanJob *job,
+		int dirfd,
+		struct FmdFile *file)
 {
-	assert(info);
+	assert(job);
+	assert(file);
+	if (!job || !file)
+		return (errno = EINVAL), -1;
 
 	/* File should have minimum length in order to probe it */
-	if (info->stat.st_size < 256)
+	if (file->stat.st_size < 256)
 		return 0;
 
-	struct FmdStream *stream = fmdp_open_file(dirfd, info, /*cache*/1);
-	if (!stream)
+	struct FmdStream *stream = fmdp_open_file(dirfd, file, /*cache*/1);
+	if (!stream) {
+		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
+			 "fmdp_open_file", file->path, strerror(errno));
 		return -1;
+	}
+	stream->job = job;
 
 	size_t len = FMDP_READ_PAGE_SZ;
 	if ((off_t)len > stream->file->stat.st_size)
@@ -530,7 +539,9 @@ fmdp_probe_file(int dirfd, struct FmdFile *info)
 		    p[6] < 0x80 && p[7] < 0x80 && p[8] < 0x80 && p[9] < 0x80 &&
 		    fmdp_do_mp3v2(stream) == 0)
 			goto end;
-	}
+	} else
+		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
+			 "read", file->path, strerror(errno));
 
 end:
 	stream->close(stream);
