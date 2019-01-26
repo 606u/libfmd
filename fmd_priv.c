@@ -338,16 +338,19 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 
 	/* XXX: align read to optimal block size, if possible */
 	/* XXX: align read not to include already cached page */
+	len = FMDP_READ_PAGE_SZ;
+	if (offs + (off_t)len > filesize)
+		len = filesize - offs;
 	const uint8_t *ptr =
-		cstr->next->get(cstr->next, offs, FMDP_READ_PAGE_SZ);
+		cstr->next->get(cstr->next, offs, len);
 	if (!ptr) {
 		FMDP_X(0);
 		return 0;
 	}
 
-	memcpy(best->data, ptr, FMDP_READ_PAGE_SZ);
+	memcpy(best->data, ptr, len);
 	best->offs = offs;
-	best->len = FMDP_READ_PAGE_SZ;
+	best->len = len;
 	best->hits = 1;
 	best->gen = ++cstr->gen;
 	cstr->last_hit = best;
