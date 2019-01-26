@@ -28,6 +28,7 @@ fmdp_add(struct FmdFile *file,
 		file->metadata = elem;
 		return elem;
 	}
+	FMDP_X(0);
 	return 0;
 }
 
@@ -41,6 +42,7 @@ fmdp_add_n(struct FmdFile *file,
 		elem->n = value;
 		return 0;
 	}
+	FMDP_X(-1);
 	return -1;
 }
 
@@ -54,6 +56,7 @@ fmdp_add_frac(struct FmdFile *file,
 		elem->frac = value;
 		return 0;
 	}
+	FMDP_X(-1);
 	return -1;
 }
 
@@ -67,6 +70,7 @@ fmdp_add_timestamp(struct FmdFile *file,
 		elem->timestamp = value;
 		return 0;
 	}
+	FMDP_X(-1);
 	return -1;
 }
 
@@ -86,8 +90,8 @@ fmdp_add_text(struct FmdFile *file,
 		elem->text[len] = '\0';
 		return 0;
 	}
+	FMDP_X(-1);
 	return -1;
-
 }
 
 int
@@ -171,8 +175,11 @@ fmdp_add_unicodewbom(struct FmdFile *file,
 			*o = '\0';
 			return 0;
 		}
-	} else
+	} else {
+		FMDP_X(-1);
 		return (errno = EINVAL), -1;
+	}
+	FMDP_X(-1);
 	return -1;		/* out-of-memory */
 }
 
@@ -297,6 +304,7 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 	    offs + (off_t)len > filesize ||
 	    !len) {
 		errno = ERANGE;
+		FMDP_X(0);
 		return 0;
 	}
 
@@ -332,8 +340,10 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 	/* XXX: align read not to include already cached page */
 	const uint8_t *ptr =
 		cstr->next->get(cstr->next, offs, FMDP_READ_PAGE_SZ);
-	if (!ptr)
+	if (!ptr) {
+		FMDP_X(0);
 		return 0;
+	}
 
 	memcpy(best->data, ptr, FMDP_READ_PAGE_SZ);
 	best->offs = offs;
@@ -409,6 +419,7 @@ fmdp_file_stream_get(struct FmdStream *stream,
 		return 0;
 	if (realoffs != offs) {
 		errno = ENOTRECOVERABLE;
+		FMDP_X(0);
 		return 0;
 	}
 
@@ -419,6 +430,7 @@ fmdp_file_stream_get(struct FmdStream *stream,
 	fstr->len = reallen;
 	if (reallen < (ssize_t)len) {
 		errno = ERANGE;
+		FMDP_X(0);
 		return 0;
 	}
 
@@ -452,6 +464,7 @@ fmdp_open_file(int dirfd, struct FmdFile *file, int cached)
 			  O_RDONLY);
 	if (fstr->fd == -1) {
 		free(fstr);
+		FMDP_X(0);
 		return 0;
 	}
 
@@ -520,6 +533,7 @@ fmdp_probe_file(struct FmdScanJob *job,
 	if (!stream) {
 		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
 			 "fmdp_open_file", file->path, strerror(errno));
+		FMDP_X(-1);
 		return -1;
 	}
 	stream->job = job;

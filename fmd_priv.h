@@ -11,6 +11,15 @@
 #    define FMDP_CACHE_PAGES 4
 #  endif
 
+/* FMDP_X(res) macro is used to trace functions' failures */
+#  if defined (_DEBUG)
+#    define FMDP_X(_res)					\
+	fprintf(stderr, "libfmd: %s (%s:%u) -> %d\n",		\
+		__FUNCTION__, __FILE__, __LINE__, (_res))
+#  else
+#    define FMDP_X(_res)
+#  endif
+
 /* Adds metadata to |file| */
 int fmdp_add_n(struct FmdFile *file,
 	       enum FmdElemType elemtype, long value);

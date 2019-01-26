@@ -148,6 +148,7 @@ fmd_scan_file(struct FmdScanJob *job,
 	if (!file) {
 		job->log(job, path, fmdlt_oserr, "%s(%u): %s",
 			 "calloc", (unsigned)sz, strerror(ENOMEM));
+		FMDP_X(-1);
 		return -1;	/* errno should be ENOMEM */
 	}
 
@@ -162,6 +163,7 @@ fmd_scan_file(struct FmdScanJob *job,
 		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
 			 "fstatat", path, strerror(errno));
 		free(file);
+		FMDP_X(res);
 		return res;
 	}
 
@@ -197,6 +199,7 @@ fmd_scan_hier(struct FmdScanJob *job,
 		errno = ENAMETOOLONG;
 		job->log(job, path, fmdlt_use, "%s(%s): %s",
 			 "path", path, strerror(errno));
+		FMDP_X(-1);
 		return -1;
 	}
 
@@ -204,6 +207,7 @@ fmd_scan_hier(struct FmdScanJob *job,
 	if (dirfd == -1) {
 		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
 			 "openat", path, strerror(errno));
+		FMDP_X(-1);
 		return -1;
 	}
 	DIR *dirp = fdopendir(dirfd);
@@ -211,6 +215,7 @@ fmd_scan_hier(struct FmdScanJob *job,
 		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
 			 "fdopendir", path, strerror(errno));
 		close(dirfd);	/* could lose errno */
+		FMDP_X(-1);
 		return -1;
 	}
 
