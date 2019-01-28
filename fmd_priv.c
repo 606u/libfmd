@@ -556,6 +556,10 @@ fmdp_probe_file(struct FmdScanJob *job,
 		    p[6] < 0x80 && p[7] < 0x80 && p[8] < 0x80 && p[9] < 0x80 &&
 		    fmdp_do_mp3v2(stream) == 0)
 			goto end;
+		if (p[0] == 0 && p[1] == 0 &&
+		    p[4] == 'f' && p[5] == 't' && p[6] == 'y' && p[7] == 'p' &&
+		    fmdp_do_bmff(stream) == 0)
+			goto end;
 	} else
 		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
 			 "read", file->path, strerror(errno));

@@ -109,6 +109,11 @@ struct FmdFrameIterator {
 	 * should not be larger than FMDP_READ_PAGE_SZ */
 	int (*read)(struct FmdFrameIterator *iter);
 
+	/* Returns pointer to |len| bytes starting at |offs| from
+	 * current frame's data; partial read; invalidates |data| as
+	 * well as pointers returned by past get() calls */
+	const uint8_t* (*get)(struct FmdFrameIterator *iter,
+			      off_t offs, size_t len);
 	void (*free)(struct FmdFrameIterator *iter);
 
 	struct FmdStream *stream;
@@ -120,5 +125,6 @@ struct FmdFrameIterator {
 
 int fmdp_do_flac(struct FmdStream *stream);
 int fmdp_do_mp3v2(struct FmdStream *stream);
+int fmdp_do_bmff(struct FmdStream *stream);
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */
