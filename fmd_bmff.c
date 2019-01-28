@@ -336,7 +336,10 @@ fmdp_bmff_trace_iter(struct FmdFrameIterator *iter,
 		    !memcmp(iter->type, "udta", 4)) {
 			struct FmdFrameIterator *inner =
 				fmdp_bmffit_create_framed(bmfit);
-			fmdp_bmff_trace_iter(inner, depth + 1);
+			if (inner) {
+				fmdp_bmff_trace_iter(inner, depth + 1);
+				inner->free(inner);
+			}
 		}
 	}
 	return 0;
