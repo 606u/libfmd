@@ -94,22 +94,25 @@ main(int argc, char *argv[])
 
 	if (m_flag) {
 		fprintf(stderr, "libfmd Metrics/Statistics:\n");
-		fprintf(stderr, " * file open count %lu\n",
+		fprintf(stderr, "  * %lu files opened\n",
 			(unsigned long)job.n_filopens);
-		fprintf(stderr, " * directory open count %lu\n",
+		fprintf(stderr, "  * %lu directories opened\n",
 			(unsigned long)job.n_diropens);
-		fprintf(stderr, " * physical reads count %lu\n",
+		fprintf(stderr, "  * %lu physical reads\n",
 			(unsigned long)job.n_physreads);
-		fprintf(stderr, " * logical reads count %lu\n",
+		fprintf(stderr, "  * %lu logical reads\n",
 			(unsigned long)job.n_logreads);
-		fprintf(stderr, " * physical reads volume %.3f MB\n",
+		fprintf(stderr, "  * %.3f physical MB read\n",
 			job.v_physreads / 1024.0 / 1024.0);
-		fprintf(stderr, " * logical reads volume %.3f MB\n",
+		fprintf(stderr, "  * %.3f logical MB read\n",
 			job.v_logreads / 1024.0 / 1024.0);
-		fprintf(stderr, " * cache hits count %lu\n",
-			(unsigned long)job.n_cachehits);
-		fprintf(stderr, " * cache misses count %lu\n",
-			(unsigned long)job.n_cachemisses);
+		size_t n = job.n_cachehits + job.n_cachemisses;
+		fprintf(stderr, "  * %lu cache hits (%.2f%%)\n",
+			(unsigned long)job.n_cachehits,
+			job.n_cachehits * 100.0 / n);
+		fprintf(stderr, "  * %lu cache misses (%.2f%%)\n",
+			(unsigned long)job.n_cachemisses,
+			job.n_cachemisses * 100.0 / n);
 	}
 
 	return 0;
