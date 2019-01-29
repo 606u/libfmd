@@ -425,6 +425,55 @@ fmdp_bmff_do_ftyp(struct FmdBmffScanContext *ctx,
 
 
 static int
+fmdp_bmff_do_moov_mvhd(struct FmdBmffScanContext *ctx,
+		       struct FmdFrameIterator *iter,
+		       int depth,
+		       const struct FmdBmffHandlerMap *map)
+{
+	assert(ctx);
+	assert(iter);
+	(void)depth;
+	assert(map); (void)map;
+	if (!ctx || !iter)
+		return (errno = EINVAL), -1;
+
+	if (!fmdp_bmff_check_datalen(iter, 25 * 4, 28 * 4, 4) ||
+	    !fmdp_bmff_readdata(iter))
+		return -1;
+	assert(iter->data);
+	const uint8_t vers = iter->data[0];
+	if (vers > 1) {
+		struct FmdScanJob *job = iter->stream->job;
+		job->log(job, iter->stream->file->path, fmdlt_format,
+			 "format(%s): 'mvhd' vers %u is unsupported",
+			 iter->stream->file->path, (unsigned)vers);
+		return 0;
+	}
+
+	const uint8_t *p = iter->data + 4; /* skip vers & flags */
+	long timescale, units;
+	if (vers == 0) {	/* 32-bit time & duration */
+		timescale = fmdp_get_bits_be(p, 2 * 32, 32);
+		units = fmdp_get_bits_be(p, 3 * 32, 32);
+	} else {		/* 64-bit time & duration */
+		timescale = fmdp_get_bits_be(p, 2 * 64, 32);
+		units = fmdp_get_bits_be(p, 2 * 64 + 32, 64);
+	}
+	if (units > 0 && timescale > 0) {
+		double duration = (double)units / (double)timescale;
+		return fmdp_add_frac(iter->stream->file, fmdet_duration,
+				     duration);
+	} else {
+		struct FmdScanJob *job = iter->stream->job;
+		job->log(job, iter->stream->file->path, fmdlt_format,
+			 "format(%s): 'mvhd' w/ zero timescale",
+			 iter->stream->file->path);
+		return 0;
+	}
+}
+
+
+static int
 fmdp_bmff_do_meta_hdlr(struct FmdBmffScanContext *ctx,
 		       struct FmdFrameIterator *iter,
 		       int depth,
@@ -446,10 +495,9 @@ fmdp_bmff_do_meta_hdlr(struct FmdBmffScanContext *ctx,
 	memcpy(ctx->handler_type, iter->data + 8, 4);
 	if (fmd_media_trace) {
 		struct FmdScanJob *job = iter->stream->job;
-		job->log(job, iter->stream->file->path,
-			 fmdlt_trace,
-			 "%*shandler_type is '%.4s'",
-			 depth * 2, "", ctx->handler_type);
+		job->log(job, iter->stream->file->path, fmdlt_trace,
+			 "%*shandler_type is '%.4s'", depth * 2, "",
+			 ctx->handler_type);
 	}
 	return 0;
 
@@ -634,6 +682,8 @@ fmdp_do_bmff(struct FmdStream *stream)
 		  &fmdp_bmff_do_ftyp },
 		{ { 0, 0, 0, 0 }, { 'm', 'o', 'o', 'v' },
 		  &fmdp_bmff_iterate_children },
+		{ { 'm', 'o', 'o', 'v' }, { 'm', 'v', 'h', 'd' },
+		  &fmdp_bmff_do_moov_mvhd },
 		{ { 'm', 'o', 'o', 'v' }, { 'u', 'd', 't', 'a' },
 		  &fmdp_bmff_iterate_children },
 		{ { 'u', 'd', 't', 'a' }, { 'm', 'e', 't', 'a' },
@@ -658,8 +708,6 @@ fmdp_do_bmff(struct FmdStream *stream)
 	if (!iter)
 		return -1;
 
-	/* XXX: get duration */
-	/* XXX: get file metadata from moov.udta.meta.ilst Box */
 	/* Unofficial details for (some) Quicktime atoms:
 	 * http://atomicparsley.sourceforge.net/mpeg-4files.html and
 	 * https://infohost.nmt.edu/~john/scans/d300/old-exiftool/html/TagNames/QuickTime.html#ImageDesc */
