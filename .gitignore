@@ -54,3 +54,10 @@ dkms.conf
 
 # Build outputs
 fmdscan
+
+# Backup & temporary files
+*~
+*#
+
+# A directory with or symlink to where sample files are
+samples
