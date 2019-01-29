@@ -294,6 +294,7 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 	assert(stream);
 	assert(len);
 
+	struct FmdScanJob *job = stream->job;
 	struct FmdCachedStream *cstr = FMDP_GET_CSTR(stream);
 	/* Convert offsets, relative to end-of-file to absolute
 	 * offsets; also make sure request is within file size */
@@ -322,6 +323,10 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 			cstr->last_hit = it;
 
 			/* Return from cache */
+			++job->n_logreads;
+			++job->n_cachehits;
+			job->v_logreads += len;
+
 			return it->data + (offs - it->offs);
 		}
 		if (!it->len)
@@ -335,6 +340,7 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 	/* Not found in cache, will read into |unused| or |best| */
 	if (unused)
 		best = unused;
+	++job->n_cachemisses;
 
 	/* XXX: align read to optimal block size, if possible */
 	/* XXX: align read not to include already cached page */
@@ -354,6 +360,9 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 	best->hits = 1;
 	best->gen = ++cstr->gen;
 	cstr->last_hit = best;
+
+	++job->n_logreads;
+	job->v_logreads += len;
 
 	assert(offs >= best->offs);
 	return best->data + (offs - best->offs);
@@ -429,6 +438,11 @@ fmdp_file_stream_get(struct FmdStream *stream,
 	ssize_t reallen = read(fstr->fd, fstr->buf, FMDP_READ_PAGE_SZ);
 	if (reallen == -1)
 		return 0;
+
+	struct FmdScanJob *job = stream->job;
+	++job->n_physreads;
+	job->v_physreads += len;
+
 	fstr->offs = realoffs;
 	fstr->len = reallen;
 	if (reallen < (ssize_t)len) {
@@ -451,8 +465,10 @@ fmdp_file_stream_close(struct FmdStream *stream)
 }
 
 struct FmdStream*
-fmdp_open_file(int dirfd, struct FmdFile *file, int cached)
+fmdp_open_file(struct FmdScanJob *job,
+	       int dirfd, struct FmdFile *file, int cached)
 {
+	assert(job);
 	assert(file);
 
 	struct FmdFileStream *fstr =
@@ -462,6 +478,7 @@ fmdp_open_file(int dirfd, struct FmdFile *file, int cached)
 
 	fstr->base.get = &fmdp_file_stream_get;
 	fstr->base.close = &fmdp_file_stream_close;
+	fstr->base.job = job;
 	fstr->base.file = file;
 	fstr->fd = openat(dirfd, dirfd != AT_FDCWD ? file->name : file->path,
 			  O_RDONLY);
@@ -470,6 +487,7 @@ fmdp_open_file(int dirfd, struct FmdFile *file, int cached)
 		FMDP_X(0);
 		return 0;
 	}
+	++job->n_filopens;
 
 	/* Issue a request to read file header */
 	struct FmdStream *res = &fstr->base;
@@ -532,7 +550,7 @@ fmdp_probe_file(struct FmdScanJob *job,
 	if (file->stat.st_size < 256)
 		return 0;
 
-	struct FmdStream *stream = fmdp_open_file(dirfd, file, /*cache*/1);
+	struct FmdStream *stream = fmdp_open_file(job, dirfd, file, /*cache*/1);
 	if (!stream) {
 		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
 			 "fmdp_open_file", file->path, strerror(errno));

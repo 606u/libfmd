@@ -40,4 +40,4 @@ fmd_bmff.o: fmd_bmff.c fmd.h fmd_priv.h
 	$(CC) $(CFLAGS) -g -fPIC -c $< -o $@
 
 test: $(fmdscan)
-	lldb -f ./$(fmdscan) -- -r samples
+	lldb -f ./$(fmdscan) -- -rm samples

@@ -114,6 +114,12 @@ struct FmdScanJob {
 	 * |file| to the chain if hook is assigned and returns
 	 * non-zero */
 	int (*finish)(struct FmdScanJob *job, struct FmdFile *file);
+
+	/* Metrics/Statistics. n_ -> # of, v_ -> volume/octets */
+	size_t n_filopens, n_diropens;
+	size_t n_physreads, n_logreads;
+	off_t v_physreads, v_logreads;
+	size_t n_cachehits, n_cachemisses;
 };
 
 /* Read metadata from a file or a directory tree at |job->location|,

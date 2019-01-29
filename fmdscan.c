@@ -57,12 +57,13 @@ finish_hook(struct FmdScanJob *job, struct FmdFile *file)
 int
 main(int argc, char *argv[])
 {
-	int r_flag = 0, opt;
-	while ((opt = getopt(argc, argv, "rh")) != -1)
+	int r_flag = 0, m_flag = 0, opt;
+	while ((opt = getopt(argc, argv, "rmh")) != -1)
 		switch (opt) {
 		case 'r': r_flag = 1; break;
+		case 'm': m_flag = 1; break;
 		case 'h': usage(); return 0;
-		case '*': return EX_USAGE;
+		case '?': return EX_USAGE;
 		}
 	argc -= optind;
 	argv += optind;
@@ -90,5 +91,26 @@ main(int argc, char *argv[])
 		fmd_free_chain(job.first_file);
 		job.first_file = 0;
 	}
+
+	if (m_flag) {
+		fprintf(stderr, "libfmd Metrics/Statistics:\n");
+		fprintf(stderr, " * file open count %lu\n",
+			(unsigned long)job.n_filopens);
+		fprintf(stderr, " * directory open count %lu\n",
+			(unsigned long)job.n_diropens);
+		fprintf(stderr, " * physical reads count %lu\n",
+			(unsigned long)job.n_physreads);
+		fprintf(stderr, " * logical reads count %lu\n",
+			(unsigned long)job.n_logreads);
+		fprintf(stderr, " * physical reads volume %.3f MB\n",
+			job.v_physreads / 1024.0 / 1024.0);
+		fprintf(stderr, " * logical reads volume %.3f MB\n",
+			job.v_logreads / 1024.0 / 1024.0);
+		fprintf(stderr, " * cache hits count %lu\n",
+			(unsigned long)job.n_cachehits);
+		fprintf(stderr, " * cache misses count %lu\n",
+			(unsigned long)job.n_cachemisses);
+	}
+
 	return 0;
 }

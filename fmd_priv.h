@@ -78,7 +78,8 @@ struct FmdStream {
 	struct FmdScanJob *job;
 	struct FmdFile *file;
 };
-struct FmdStream* fmdp_open_file(int dirfd, struct FmdFile *file, int cached);
+struct FmdStream* fmdp_open_file(struct FmdScanJob *job,
+				 int dirfd, struct FmdFile *file, int cached);
 
 /* Returns |len| big-endian bits from |offs|, also in bits */
 long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);

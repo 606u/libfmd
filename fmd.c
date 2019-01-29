@@ -210,6 +210,7 @@ fmd_scan_hier(struct FmdScanJob *job,
 		FMDP_X(-1);
 		return -1;
 	}
+	++job->n_filopens;
 	DIR *dirp = fdopendir(dirfd);
 	if (!dirp) {
 		job->log(job, path, fmdlt_oserr, "%s(%s): %s",
@@ -218,6 +219,7 @@ fmd_scan_hier(struct FmdScanJob *job,
 		FMDP_X(-1);
 		return -1;
 	}
+	++job->n_diropens;
 
 	struct FmdFile *rv = 0;
 	{
