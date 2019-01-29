@@ -287,10 +287,10 @@ fmd_dummy_log(struct FmdScanJob *job,
 	      enum FmdLogType lt,
 	      const char *fmt, ...)
 {
-	assert(job);
-	assert(path);
+	assert(job); (void)job;
+	assert(path); (void)path;
 	(void)lt;
-	assert(fmt);
+	assert(fmt); (void)fmt;
 }
 
 

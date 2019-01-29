@@ -399,7 +399,7 @@ fmdp_bmff_do_ftyp(struct FmdBmffScanContext *ctx,
 	assert(ctx);
 	assert(iter);
 	(void)depth;
-	assert(map);
+	assert(map); (void)map;
 	if (!ctx || !iter)
 		return (errno = EINVAL), -1;
 
@@ -433,7 +433,7 @@ fmdp_bmff_do_meta_hdlr(struct FmdBmffScanContext *ctx,
 	assert(ctx);
 	assert(iter);
 	(void)depth;
-	assert(map);
+	assert(map); (void)map;
 	if (!ctx || !iter)
 		return (errno = EINVAL), -1;
 
@@ -533,7 +533,7 @@ fmdp_bmff_do_meta_ilst(struct FmdBmffScanContext *ctx,
 	assert(ctx);
 	assert(iter);
 	(void)depth;
-	assert(map);
+	assert(map); (void)map;
 	if (!ctx || !iter)
 		return (errno = EINVAL), -1;
 
@@ -583,7 +583,7 @@ fmdp_bmff_do_meta(struct FmdBmffScanContext *ctx,
 	assert(ctx);
 	assert(iter);
 	(void)depth;
-	assert(map);
+	assert(map); (void)map;
 	if (!ctx || !iter)
 		return (errno = EINVAL), -1;
 

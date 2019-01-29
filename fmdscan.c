@@ -20,8 +20,8 @@ log_hook(struct FmdScanJob *job,
 	 const char *fmt, ...)
 {
 	static const char *label[] = { "trc", "fmt", "ose", "use" };
-	assert(job);
-	assert(path);
+	assert(job); (void)job;
+	assert(path); (void)path;
 	(void)lt;
 	assert(fmt);
 
@@ -36,7 +36,7 @@ log_hook(struct FmdScanJob *job,
 static int
 begin_hook(struct FmdScanJob *job, const char *path)
 {
-	assert(job);
+	assert(job); (void)job;
 	assert(path);
 	fprintf(stderr, "\rScanning '%s'...   ", path);
 	fflush(stderr);
@@ -46,7 +46,7 @@ begin_hook(struct FmdScanJob *job, const char *path)
 static int
 finish_hook(struct FmdScanJob *job, struct FmdFile *file)
 {
-	assert(job);
+	assert(job); (void)job;
 	assert(file);
 	fprintf(stderr, "\rFinished '%s'.   ", file->path);
 	fflush(stderr);
