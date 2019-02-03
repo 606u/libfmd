@@ -185,7 +185,6 @@ fmd_scan_file(struct FmdScanJob *job,
 		file->mimetype = "application/binary-stream";
 	else
 		file->filetype = fmdft_directory;
-	fmdp_add_text(file, fmdet_other, "x=y", -1);
 
 	*info = file;
 	if (!is_dir && (job->flags & fmdsf_metadata) == fmdsf_metadata)
