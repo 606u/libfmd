@@ -42,6 +42,8 @@ const char *fmd_elemtype[] = {
 	"sampling_rate",
 	"num_channels",
 	"bits_per_sample",
+
+	"other",
 };
 const char *fmd_datatype[] = {
 	"n",
@@ -79,6 +81,17 @@ fmd_print_elem(const struct FmdElem *elem,
 			fprintf(where, "\t%s: (timestamp)\n", name);
 		return;
 	case fmddt_text:
+		if (elem->elemtype == fmdet_other) {
+			/* text is "key=value" */
+			const char *eq = strchr(elem->text, '=');
+			assert(eq);
+			if (eq) {
+				fprintf(where, "\t%.*s: '%s'\n",
+					(int)(eq - elem->text), elem->text,
+					eq + 1);
+				return;
+			}
+		}
 		fprintf(where, "\t%s: '%s'\n", name, elem->text);
 		return;
 	}
@@ -172,6 +185,8 @@ fmd_scan_file(struct FmdScanJob *job,
 		file->mimetype = "application/binary-stream";
 	else
 		file->filetype = fmdft_directory;
+	fmdp_add_text(file, fmdet_other, "x=y", -1);
+
 	*info = file;
 	if (!is_dir && (job->flags & fmdsf_metadata) == fmdsf_metadata)
 		return fmdp_probe_file(job, dirfd, file), 0;

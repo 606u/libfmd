@@ -84,6 +84,11 @@ fmdp_add_text(struct FmdFile *file,
 	if (len == -1)
 		len = strlen(s);
 
+	if (elemtype == fmdet_other) {
+		/* Format of "other" elements is "key=value" */
+		assert(strchr(s, '='));
+	}
+
 	struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_text, len);
 	if (elem) {
 		memcpy(elem->text, s, len);

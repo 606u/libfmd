@@ -57,6 +57,8 @@ enum FmdElemType {
 	fmdet_sampling_rate,	/* n */
 	fmdet_num_channels,	/* n */
 	fmdet_bits_per_sample,	/* n */
+
+	fmdet_other,		/* text: key=value */
 };
 extern const char *fmd_elemtype[];
 
