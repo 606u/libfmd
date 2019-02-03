@@ -42,6 +42,13 @@ const char *fmd_elemtype[] = {
 	"sampling_rate",
 	"num_channels",
 	"bits_per_sample",
+	"frame_width",
+	"frame_height",
+	"exposure_time",
+	"fnumber",
+	"iso_speed",
+	"focal_length",
+	"focal_length35",
 
 	"other",
 };

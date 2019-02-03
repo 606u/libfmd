@@ -87,6 +87,8 @@ struct FmdStream* fmdp_open_file(struct FmdScanJob *job,
 
 /* Returns |len| big-endian bits from |offs|, also in bits */
 long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
+/* Returns |len| little-endian bits from |offs|, also in bits */
+long fmdp_get_bits_le(const uint8_t *p, size_t offs, size_t len);
 
 int fmdp_probe_file(struct FmdScanJob *job, int dirfd, struct FmdFile *info);
 
@@ -131,5 +133,6 @@ struct FmdFrameIterator {
 int fmdp_do_flac(struct FmdStream *stream);
 int fmdp_do_mp3v2(struct FmdStream *stream);
 int fmdp_do_bmff(struct FmdStream *stream);
+int fmdp_do_tiff(struct FmdStream *stream);
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */

@@ -611,6 +611,45 @@ fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len)
 }
 
 
+long
+fmdp_get_bits_le(const uint8_t *p, size_t offs, size_t len)
+{
+	assert(p);
+	assert(len);
+
+	/* Position at initial byte */
+	size_t o = offs / 8;
+	p += o;
+	offs -= o * 8;
+
+	/* Extract the most-significant bits from the first byte */
+	assert(offs < 8);
+	size_t have = 8 - offs;
+	size_t extra = len > have ? 0 : have - len;
+	size_t bits = len > have ? have : len;
+	long rv = (*p >> offs) & (0xff >> (8 - bits));
+
+	/* From here on |last| is always 7, |rem| is always 8, |offs|
+	 * is shift to apply to the next value */
+	offs = bits;
+	++p;
+	len -= bits;
+
+	while (len) {
+		/* Start from least-significant bits */
+		extra = len > 8 ? 0 : 8 - len;
+		bits = len > 8 ? 8 : len;
+		long x = *p & (0xff >> (8 - bits));
+		x = x << offs;
+		rv = rv | x;
+		++p;
+		len -= bits;
+		offs += bits;
+	}
+	return rv;
+}
+
+
 int
 fmdp_probe_file(struct FmdScanJob *job,
 		int dirfd,
@@ -652,6 +691,10 @@ fmdp_probe_file(struct FmdScanJob *job,
 		if (p[0] == 0 && p[1] == 0 &&
 		    p[4] == 'f' && p[5] == 't' && p[6] == 'y' && p[7] == 'p' &&
 		    fmdp_do_bmff(stream) == 0)
+			goto end;
+		if ((!memcmp(p, "MM\000\052", 4) ||
+		     !memcmp(p, "II\052\000", 4)) &&
+		    fmdp_do_tiff(stream) == 0)
 			goto end;
 	} else
 		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",

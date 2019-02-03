@@ -7,7 +7,7 @@ buildflags := $(buildflags:debug=-D_DEBUG -O0)
 buildflags := $(buildflags:release=-DNDEBUG -O2)
 CFLAGS += $(buildflags)
 
-libfmd_sources = fmd.c fmd_priv.c fmd_audio.c fmd_bmff.c
+libfmd_sources = fmd.c fmd_priv.c fmd_audio.c fmd_bmff.c fmd_tiff.c
 libfmd_objects = $(libfmd_sources:.c=.o)
 libfmd_so = libfmd.so.0
 libfmd_a = libfmd.a
@@ -35,6 +35,7 @@ fmd.o: fmd.c fmd.h fmd_priv.h
 fmd_priv.o: fmd_priv.c fmd.h fmd_priv.h
 fmd_audio.o: fmd_audio.c fmd.h fmd_priv.h
 fmd_bmff.o: fmd_bmff.c fmd.h fmd_priv.h
+fmd_tiff.o: fmd_tiff.c fmd.h fmd_priv.h
 
 .c.o:
 	$(CC) $(CFLAGS) -g -fPIC -c $< -o $@

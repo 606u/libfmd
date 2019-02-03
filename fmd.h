@@ -57,6 +57,13 @@ enum FmdElemType {
 	fmdet_sampling_rate,	/* n */
 	fmdet_num_channels,	/* n */
 	fmdet_bits_per_sample,	/* n */
+	fmdet_frame_width,	/* n */
+	fmdet_frame_height,	/* n */
+	fmdet_exposure_time,	/* in seconds, rational or frac */
+	fmdet_fnumber,		/* rational */
+	fmdet_iso_speed,	/* n */
+	fmdet_focal_length,	/* in mm, frac */
+	fmdet_focal_length35,	/* in mm, frac */
 
 	fmdet_other,		/* text: key=value */
 };
