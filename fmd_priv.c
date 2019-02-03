@@ -362,6 +362,14 @@ struct FmdCachedStream {
 #define FMDP_GET_CSTR(_stream)			\
 	(struct FmdCachedStream*)((_stream) - offsetof(struct FmdCachedStream, base))
 
+static off_t
+fmdp_cached_stream_size(struct FmdStream *stream)
+{
+	assert(stream);
+	struct FmdCachedStream *cstr = FMDP_GET_CSTR(stream);
+	return cstr->next->size(cstr->next);
+}
+
 static const uint8_t*
 fmdp_cached_stream_get(struct FmdStream *stream,
 		       off_t offs, size_t len)
@@ -373,7 +381,7 @@ fmdp_cached_stream_get(struct FmdStream *stream,
 	struct FmdCachedStream *cstr = FMDP_GET_CSTR(stream);
 	/* Convert offsets, relative to end-of-file to absolute
 	 * offsets; also make sure request is within file size */
-	const off_t filesize = stream->file->stat.st_size;
+	const off_t filesize = stream->size(stream);
 	if (offs < 0)
 		offs = filesize - offs;
 	if (offs < 0 ||
@@ -462,6 +470,7 @@ fmdp_cache_stream(struct FmdStream *stream)
 	struct FmdCachedStream *cstr =
 		(struct FmdCachedStream*)calloc(1, sizeof *cstr);
 	if (cstr) {
+		cstr->base.size = &fmdp_cached_stream_size;
 		cstr->base.get = &fmdp_cached_stream_get;
 		cstr->base.close = &fmdp_cached_stream_close;
 		cstr->base.file = stream->file;
@@ -484,6 +493,14 @@ struct FmdFileStream {
 };
 #define FMDP_GET_FSTR(_stream)			\
 	(struct FmdFileStream*)((_stream) - offsetof(struct FmdFileStream, base))
+
+static off_t
+fmdp_file_stream_size(struct FmdStream *stream)
+{
+	assert(stream);
+	struct FmdFileStream *fstr = FMDP_GET_FSTR(stream);
+	return fstr->base.file->stat.st_size;
+}
 
 static const uint8_t*
 fmdp_file_stream_get(struct FmdStream *stream,
@@ -551,6 +568,7 @@ fmdp_open_file(struct FmdScanJob *job,
 	if (!fstr)
 		return 0;
 
+	fstr->base.size = &fmdp_file_stream_size;
 	fstr->base.get = &fmdp_file_stream_get;
 	fstr->base.close = &fmdp_file_stream_close;
 	fstr->base.job = job;
@@ -673,9 +691,10 @@ fmdp_probe_file(struct FmdScanJob *job,
 	}
 	stream->job = job;
 
+	const off_t ssize = stream->size(stream);
 	size_t len = FMDP_READ_PAGE_SZ;
-	if ((off_t)len > stream->file->stat.st_size)
-		len = (size_t)stream->file->stat.st_size;
+	if ((off_t)len > ssize)
+		len = (size_t)ssize;
 	const uint8_t *p = stream->get(stream, 0, len);
 	if (p) {
 		/* Attempt to deduce file type from header magic */

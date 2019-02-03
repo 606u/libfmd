@@ -208,14 +208,14 @@ fmdp_tiff_parse_ifd_entry(struct FmdpTiffScanContext *ctx,
 		entry->extref = 1;
 		entry->offs = (uint32_t)ctx->bits(p, 64, 32);
 		off_t endoffs = entry->offs + bytesz;
-		if (endoffs > stream->file->stat.st_size) {
+		if (endoffs > stream->size(stream)) {
 			errno = EPROTONOSUPPORT;
 			job->log(job, stream->file->path, fmdlt_format,
 				 "format(%s): TIFF IFD entry tag %u, type %u, references after EOF, %u > %u",
 				 stream->file->path,
 				 entry->tag, entry->type,
 				 (unsigned)endoffs,
-				 (unsigned)stream->file->stat.st_size);
+				 (unsigned)stream->size(stream));
 			return -1;
 		}
 	}

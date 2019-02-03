@@ -213,7 +213,7 @@ fmdp_bmffit_create(struct FmdStream *stream,
 		bmfit->start_offs = start_offs;
 		bmfit->end_offs = end_offs;
 	} else {
-		bmfit->end_offs = stream->file->stat.st_size;
+		bmfit->end_offs = stream->size(stream);
 	}
 	bmfit->offs = -1;   /* Signal _next() to start from 1st Box */
 

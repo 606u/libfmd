@@ -61,6 +61,9 @@ int fmdp_match_token_exact(const char *text, size_t len,
 			   const struct FmdToken *tokens);
 
 struct FmdStream {
+	/* Returns stream size in octets */
+	off_t (*size)(struct FmdStream *stream);
+
 	/* Reads |len| bytes from |stream|, starting at |offs|, and
 	 * returns a pointer to a readen data; returns 0 if request
 	 * cannot be fulfilled, and sets |errno|. Signals ERANGE on
