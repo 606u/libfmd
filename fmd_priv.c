@@ -12,6 +12,33 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+static int
+fmdp_gcd(int a, int b)
+{
+	if (a < 1 || b < 1)
+		return 1;
+
+	int d = 1;
+	while ((a % 2) == 0 && (b % 2) == 0) {
+		a /= 2;
+		b /= 2;
+		d *= 2;
+	}
+	while (a != b) {
+		if ((a % 2) == 0) {
+			a /= 2;
+		} else if ((b % 2) == 0) {
+			b /= 2;
+		} else if (a > b) {
+			a = (a - b) / 2;
+		} else {
+			b = (b - a) / 2;
+		}
+	}
+	return a * d;
+}
+
+
 static struct FmdElem*
 fmdp_add(struct FmdFile *file,
 	 enum FmdElemType elemtype, enum FmdDataType datatype,
@@ -81,6 +108,9 @@ fmdp_add_rational(struct FmdFile *file,
 	assert(file);
 	struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_rational, 0);
 	if (elem) {
+		int x = fmdp_gcd(num, denom);
+		num /= x;
+		denom /= x;
 		elem->numerator = num;
 		elem->denominator = denom;
 		return 0;
