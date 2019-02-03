@@ -27,8 +27,12 @@ int fmdp_add_frac(struct FmdFile *file,
 		  enum FmdElemType elemtype, double value);
 int fmdp_add_timestamp(struct FmdFile *file,
 		       enum FmdElemType elemtype, time_t value);
+int fmdp_add_rational(struct FmdFile *file,
+		      enum FmdElemType elemtype, int num, int denom);
 int fmdp_add_text(struct FmdFile *file,
 		  enum FmdElemType elemtype, const char *s, int len);
+int fmdp_add_other(struct FmdFile *file,
+		   const char *key, const char *s, int len);
 /* Adds text with Unicode BOM (byte-order mark) */
 int fmdp_add_unicodewbom(struct FmdFile *file,
 			 enum FmdElemType elemtype, const uint8_t *s, int len);

@@ -66,6 +66,7 @@ enum FmdDataType {
 	fmddt_n,
 	fmddt_frac,
 	fmddt_timestamp,
+	fmddt_rational,		/* numerator & denominator */
 	fmddt_text,
 };
 extern const char *fmd_datatype[];
@@ -80,6 +81,9 @@ struct FmdElem {
 		long n;
 		double frac;
 		time_t timestamp;
+		struct {
+			int numerator, denominator;
+		};
 		char text[1];
 	};
 };

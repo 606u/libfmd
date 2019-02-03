@@ -75,6 +75,21 @@ fmdp_add_timestamp(struct FmdFile *file,
 }
 
 int
+fmdp_add_rational(struct FmdFile *file,
+		  enum FmdElemType elemtype, int num, int denom)
+{
+	assert(file);
+	struct FmdElem *elem = fmdp_add(file, elemtype, fmddt_rational, 0);
+	if (elem) {
+		elem->numerator = num;
+		elem->denominator = denom;
+		return 0;
+	}
+	FMDP_X(-1);
+	return -1;
+}
+
+int
 fmdp_add_text(struct FmdFile *file,
 	      enum FmdElemType elemtype, const char *s, int len)
 {
@@ -93,6 +108,31 @@ fmdp_add_text(struct FmdFile *file,
 	if (elem) {
 		memcpy(elem->text, s, len);
 		elem->text[len] = '\0';
+		return 0;
+	}
+	FMDP_X(-1);
+	return -1;
+}
+
+int
+fmdp_add_other(struct FmdFile *file,
+	       const char *key, const char *s, int len)
+{
+	assert(file);
+	assert(key);
+	assert(s);
+
+	size_t keylen = strlen(key);
+	if (len == -1)
+		len = strlen(s);
+
+	size_t sz = keylen + 1 + len;
+	struct FmdElem *elem = fmdp_add(file, fmdet_other, fmddt_text, sz);
+	if (elem) {
+		memcpy(elem->text, key, keylen);
+		elem->text[keylen] = '=';
+		memcpy(elem->text + keylen + 1, s, len);
+		elem->text[keylen + 1 + len] = '\0';
 		return 0;
 	}
 	FMDP_X(-1);

@@ -49,6 +49,7 @@ const char *fmd_datatype[] = {
 	"n",
 	"frac",
 	"timestamp",
+	"rational",
 	"text",
 };
 
@@ -79,6 +80,10 @@ fmd_print_elem(const struct FmdElem *elem,
 				tm.tm_hour, tm.tm_min, tm.tm_sec);
 		else
 			fprintf(where, "\t%s: (timestamp)\n", name);
+		return;
+	case fmddt_rational:
+		fprintf(where, "\t%s: %d/%d\n", name,
+			elem->numerator, elem->denominator);
 		return;
 	case fmddt_text:
 		if (elem->elemtype == fmdet_other) {
