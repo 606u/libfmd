@@ -788,6 +788,11 @@ fmdp_probe_file(struct FmdScanJob *job,
 		     !memcmp(p, "II\052\000", 4)) &&
 		    fmdp_do_tiff(stream) == 0)
 			goto end;
+		if (p[0] == 0xff && p[1] == 0xd8 &&
+		    p[2] == 0xff && p[3] == 0xe1 &&
+		    !memcmp(p + 6, "Exif", 4) &&
+		    fmdp_do_exif(stream) == 0)
+			goto end;
 	} else
 		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
 			 "read", file->path, strerror(errno));

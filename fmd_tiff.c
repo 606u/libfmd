@@ -268,14 +268,12 @@ fmdp_tiff_do_exififd(struct FmdpTiffScanContext *ctx,
 	assert(!ifd_index);
 
 	switch (entry->tag) {
-	case fmdp_ttt_exif_exposure_time:
-		ctx->exposure_time = *entry; break;
+	case fmdp_ttt_exif_exposure_time: ctx->exposure_time = *entry; break;
 	case fmdp_ttt_exif_fnumber: ctx->fnumber = *entry; break;
 	case fmdp_ttt_exif_iso_speed: ctx->iso_speed = *entry; break;
 	case fmdp_ttt_exif_focal_length: ctx->focal_length = *entry; break;
 	case fmdp_ttt_exif_focal_length35: ctx->focal_length35 = *entry; break;
-	case fmdp_ttt_exif_exposure_prog:
-		ctx->exposure_program = *entry; break;
+	case fmdp_ttt_exif_exposure_prog: ctx->exposure_program = *entry; break;
 	}
 	return 0;
 }
@@ -535,7 +533,6 @@ fmdp_do_tiff(struct FmdStream *stream)
 	if (!stream)
 		return (errno = EINVAL), -1;
 
-	struct FmdScanJob *job = stream->job;
 	struct FmdFile *file = stream->file;
 
 	const uint8_t *p = stream->get(stream, 0, 8);
@@ -560,13 +557,6 @@ fmdp_do_tiff(struct FmdStream *stream)
 	if (res)
 		return res;
 
-	if (!ctx.width || !ctx.height) {
-		job->log(job, file->path, fmdlt_format,
-			 "format(%s): missing required fields",
-			 file->path);
-		return (errno = EPROTONOSUPPORT), 1;
-	}
-
 	stream->file->filetype = fmdft_raster;
 	stream->file->mimetype = "image/tiff";
 
@@ -579,9 +569,9 @@ fmdp_do_tiff(struct FmdStream *stream)
 				       ctx.gpsifd_offs,
 				       &fmdp_tiff_do_gpsifd);
 
-	if (res == 0)
+	if (res == 0 && ctx.width)
 		res = fmdp_add_n(file, fmdet_frame_width, ctx.width);
-	if (res == 0)
+	if (res == 0 && ctx.height)
 		res = fmdp_add_n(file, fmdet_frame_height, ctx.height);
 	if (res == 0 && ctx.samples_per_pixel)
 		res = fmdp_add_n(file, fmdet_num_channels,
