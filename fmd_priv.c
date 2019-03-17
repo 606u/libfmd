@@ -340,6 +340,79 @@ fmdp_match_token_exact(const char *text, size_t len,
 }
 
 
+/* Stream over a range/excerpt of another stream. Notice, that close()
+ * would *NOT* close underlying stream (as opposed to cached one) */
+struct FmdRangedStream {
+	struct FmdStream base;
+	struct FmdStream *next;
+
+	off_t start_offs, end_offs;
+};
+#define FMDP_GET_RSTR(_stream)			\
+	(struct FmdRangedStream*)((_stream) - offsetof(struct FmdRangedStream, base))
+
+static off_t
+fmdp_ranged_stream_size(struct FmdStream *stream)
+{
+	assert(stream);
+
+	struct FmdRangedStream *rstr = FMDP_GET_RSTR(stream);
+	return rstr->end_offs - rstr->start_offs;
+}
+
+static const uint8_t*
+fmdp_ranged_stream_get(struct FmdStream *stream,
+		       off_t offs, size_t len)
+{
+	assert(stream);
+
+	struct FmdRangedStream *rstr = FMDP_GET_RSTR(stream);
+	off_t endoffs = offs + (off_t)len;
+	if (endoffs > rstr->end_offs) {
+		FMDP_X(ERANGE);
+		return (errno = ERANGE), (void*)0;
+	}
+	return rstr->next->get(rstr->next, rstr->start_offs + offs, len);
+}
+
+static void
+fmdp_ranged_stream_close(struct FmdStream *stream)
+{
+	assert(stream);
+
+	struct FmdRangedStream *rstr = FMDP_GET_RSTR(stream);
+	free(rstr);
+}
+
+struct FmdStream*
+fmdp_ranged_stream_create(struct FmdStream *stream,
+			  off_t start_offs, off_t len)
+{
+	assert(stream);
+	assert(start_offs >= 0);
+	assert(len > 0);
+
+	off_t ssize = stream->size(stream);
+	off_t endoffs = start_offs + len;
+	if (endoffs > ssize)
+		return (errno = ERANGE), (void*)0;
+
+	struct FmdRangedStream *rstr =
+		(struct FmdRangedStream*)calloc(1, sizeof *rstr);
+	if (!rstr)
+		return 0;
+	rstr->base.size = &fmdp_ranged_stream_size;
+	rstr->base.get = &fmdp_ranged_stream_get;
+	rstr->base.close = &fmdp_ranged_stream_close;
+	rstr->base.job = stream->job;
+	rstr->base.file = stream->file;
+	rstr->next = stream;
+	rstr->start_offs = start_offs;
+	rstr->end_offs = endoffs;
+	return &rstr->base;
+}
+
+
 struct FmdCachePage {
 	uint8_t data[FMDP_READ_PAGE_SZ];
 	off_t offs, len;

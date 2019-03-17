@@ -88,6 +88,10 @@ struct FmdStream {
 struct FmdStream* fmdp_open_file(struct FmdScanJob *job,
 				 int dirfd, struct FmdFile *file, int cached);
 
+struct FmdStream* fmdp_ranged_stream_create(struct FmdStream *stream,
+					    off_t start_offs, off_t len);
+
+
 /* Returns |len| big-endian bits from |offs|, also in bits */
 long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
 /* Returns |len| little-endian bits from |offs|, also in bits */
