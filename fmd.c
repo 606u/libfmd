@@ -133,15 +133,18 @@ fmd_print_file(const struct FmdFile *file,
 		(long)file->stat.st_size, (long)file->stat.st_blksize,
 		(long)file->stat.st_blocks);
 	struct tm tm;
-	if (localtime_r(&file->stat.st_atime, &tm))
+	if (file->stat.st_atime &&
+	    localtime_r(&file->stat.st_atime, &tm))
 		fprintf(where, "  atime: %04d-%02d-%02d %02d:%02d:%02d\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec);
-	if (localtime_r(&file->stat.st_mtime, &tm))
+	if (file->stat.st_mtime &&
+	    localtime_r(&file->stat.st_mtime, &tm))
 		fprintf(where, "  mtime: %04d-%02d-%02d %02d:%02d:%02d\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec);
-	if (localtime_r(&file->stat.st_ctime, &tm))
+	if (file->stat.st_ctime &&
+	    localtime_r(&file->stat.st_ctime, &tm))
 		fprintf(where, "  ctime: %04d-%02d-%02d %02d:%02d:%02d\n",
 			tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 			tm.tm_hour, tm.tm_min, tm.tm_sec);
