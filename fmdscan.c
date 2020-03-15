@@ -9,7 +9,7 @@
 static void
 usage(void)
 {
-	puts("Usage: fmdscan [-r] <path>");
+	puts("usage: fmdscan [-amr] <path>");
 }
 
 
@@ -57,9 +57,10 @@ finish_hook(struct FmdScanJob *job, struct FmdFile *file)
 int
 main(int argc, char *argv[])
 {
-	int r_flag = 0, m_flag = 0, opt;
-	while ((opt = getopt(argc, argv, "rmh")) != -1)
+	int a_flag = 0, r_flag = 0, m_flag = 0, opt;
+	while ((opt = getopt(argc, argv, "armh")) != -1)
 		switch (opt) {
+		case 'a': a_flag = 1; break;
 		case 'r': r_flag = 1; break;
 		case 'm': m_flag = 1; break;
 		case 'h': usage(); return 0;
@@ -77,6 +78,8 @@ main(int argc, char *argv[])
 	job.finish = &finish_hook;
 
 	job.flags = fmdsf_single | fmdsf_metadata;
+	if (a_flag)
+		job.flags |= fmdsf_archives;
 	if (r_flag)
 		job.flags |= fmdsf_recursive;
 	int i;

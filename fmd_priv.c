@@ -793,6 +793,10 @@ fmdp_probe_file(struct FmdScanJob *job,
 		    !memcmp(p + 6, "Exif", 4) &&
 		    fmdp_do_exif(stream) == 0)
 			goto end;
+		/* XXX: consider delaying this for a second stage */
+		if ((job->flags & fmdsf_archives) == fmdsf_archives &&
+		    fmdp_do_arch(stream) == 0)
+			goto end;
 	} else
 		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
 			 "read", file->path, strerror(errno));

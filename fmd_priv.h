@@ -142,5 +142,6 @@ int fmdp_do_mp3v2(struct FmdStream *stream);
 int fmdp_do_bmff(struct FmdStream *stream);
 int fmdp_do_tiff(struct FmdStream *stream);
 int fmdp_do_exif(struct FmdStream *stream);
+int fmdp_do_arch(struct FmdStream *stream);
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */

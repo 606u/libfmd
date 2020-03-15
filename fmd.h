@@ -12,7 +12,7 @@ enum FmdScanFlags {
 
 	/* also scan for metadata */
 	fmdsf_metadata = 1 << 1,
-	/* also scan archived files (not currently implemented) */
+	/* also scan archived files */
 	fmdsf_archives = 1 << 2
 };
 
