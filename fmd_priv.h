@@ -10,6 +10,10 @@
 #  if !defined (FMDP_CACHE_PAGES)
 #    define FMDP_CACHE_PAGES 4
 #  endif
+#  if !defined (FMDP_MIN_FSIZE)
+/* Minimum file size to probe */
+#    define FMDP_MIN_FSIZE 256
+#  endif
 
 /* FMDP_X(res) macro is used to trace functions' failures */
 #  if defined (_DEBUG)

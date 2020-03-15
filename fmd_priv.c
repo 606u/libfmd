@@ -778,7 +778,7 @@ fmdp_probe_file(struct FmdScanJob *job,
 		return (errno = EINVAL), -1;
 
 	/* File should have minimum length in order to probe it */
-	if (file->stat.st_size < 256)
+	if (file->stat.st_size < FMDP_MIN_FSIZE)
 		return 0;
 
 	struct FmdStream *stream = fmdp_open_file(job, dirfd, file, /*cache*/1);
@@ -804,6 +804,9 @@ fmdp_probe_stream(struct FmdStream *stream)
 	struct FmdScanJob *job = stream->job;
 
 	const off_t ssize = stream->size(stream);
+	/* File should have minimum length in order to probe it */
+	if (ssize < FMDP_MIN_FSIZE)
+		return 0;
 	size_t len = FMDP_READ_PAGE_SZ;
 	if ((off_t)len > ssize)
 		len = (size_t)ssize;
