@@ -98,6 +98,7 @@ long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
 long fmdp_get_bits_le(const uint8_t *p, size_t offs, size_t len);
 
 int fmdp_probe_file(struct FmdScanJob *job, int dirfd, struct FmdFile *info);
+int fmdp_probe_stream(struct FmdStream *stream);
 
 /* Reads 1st page or whole file, whatever is less, defines |len|, |p|
  * and |endp|; returns -1 on failure to do so */

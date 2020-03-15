@@ -37,6 +37,8 @@ enum FmdFileType {
 	fmdft_spreadsheet,
 	fmdft_presentation,
 	fmtft_mail,
+	/* Contains directories and files, for example a zip file */
+	fmdft_archive,
 };
 extern const char *fmd_filetype[];
 

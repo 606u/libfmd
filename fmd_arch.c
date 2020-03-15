@@ -62,15 +62,13 @@ fmdp_do_arch(struct FmdStream *stream)
 
 	struct FmdScanJob *job = stream->job;
 	int rv = 0;
+	size_t fpathlen = strlen(stream->file->path);
 
 	struct FmdArchState ast;
 	ast.stream = stream;
 	ast.size = stream->size(stream);
 	ast.off = 0;
 
-	if (fmd_arch_trace)
-		job->log(job, stream->file->path, fmdlt_trace,
-			 "testing if '%s' is an archive", stream->file->path);
 	struct archive *a = archive_read_new();
 	if (!a)
 		return (errno = ENOMEM), -1;
@@ -80,20 +78,48 @@ fmdp_do_arch(struct FmdStream *stream)
 	rv = archive_read_open2(a, &ast, /*open:*/0, &fmdp_arch_read_callback,
 				&fmdp_arch_skip_callback, &fmdp_arch_close_callback);
 	if (rv == ARCHIVE_OK) {
+		/* TODO: read mime-type from libarchive(3) */
+		stream->file->filetype = fmdft_archive;
 		if (fmd_arch_trace)
 			job->log(job, stream->file->path, fmdlt_trace,
-				 "archive '%s' opened", stream->file->path);
+				 "archive '%s' opened with %d filter(s)",
+				 stream->file->path, archive_filter_count(a));
+
+		struct FmdFile *children = 0, *tail = 0;
 		struct archive_entry *entry;
 		while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+			const char *epath = archive_entry_pathname(entry);
+			size_t epathlen = strlen(epath);
+
 			if (fmd_arch_trace)
 				job->log(job, stream->file->path, fmdlt_trace,
-					 " -> %s",archive_entry_pathname(entry));
+					 " -> %s", epath);
+			size_t sz = sizeof (struct FmdFile) + fpathlen + 1 + epathlen;
+			struct FmdFile *file = (struct FmdFile*)calloc(1, sz);
+			if (!file)
+				/* XXX: set errno to ENOMEM needed? */
+				break;
+			snprintf(file->path, fpathlen + 1 + epathlen + 1, "%s/%s",
+				 stream->file->path, epath);
+			file->name = strrchr(file->path, '/') + 1;
+			file->stat = *archive_entry_stat(entry);
+
+			if (tail)
+				tail->next = file;
+			else
+				children = file;
+			tail = file;
 		}
+
+		if (children) {
+			/* Put children right after archive they're in */
+			assert(tail);
+			tail->next = stream->file->next;
+			stream->file->next = children;
+		}
+
 		rv = 0;
 	} else {
-		if (fmd_arch_trace)
-			job->log(job, stream->file->path, fmdlt_trace,
-				 "not an archive");
 		errno = EPROTONOSUPPORT;
 		rv = -1;
 	}

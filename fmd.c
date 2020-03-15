@@ -25,6 +25,7 @@ const char *fmd_filetype[] = {
 	"spreadsheet",
 	"presentation",
 	"mail",
+	"archive",
 };
 const char *fmd_elemtype[] = {
 	"title",
