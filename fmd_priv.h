@@ -20,8 +20,12 @@
 #    define FMDP_X(_res)					\
 	fprintf(stderr, "libfmd: %s (%s:%u) -> %d\n",		\
 		__FUNCTION__, __FILE__, __LINE__, (_res))
+#    define FMDP_XM(_res, _fmt, ...)				\
+	fprintf(stderr, "libfmd: %s (%s:%u): " _fmt " -> %d\n",	\
+		__FUNCTION__, __FILE__, __LINE__, __VA_ARGS__, (_res))
 #  else
 #    define FMDP_X(_res)
+#    define FMDP_XM(_res, _fmt, ...)
 #  endif
 
 struct FmdPriv {
