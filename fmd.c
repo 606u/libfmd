@@ -126,9 +126,12 @@ fmd_print_file(const struct FmdFile *file,
 	assert(file->filetype < sizeof(fmd_filetype) / sizeof(fmd_filetype[0]));
 	fprintf(where, "  filetype: '%s'\n", fmd_filetype[file->filetype]);
 	fprintf(where, "  mimetype: '%s'\n", file->mimetype);
-	fprintf(where, "  dev %ld, ino %ld, links %ld\n",
-		(long)file->stat.st_dev, (long)file->stat.st_ino,
-		(long)file->stat.st_nlink);
+	if (file->stat.st_dev ||
+	    file->stat.st_ino ||
+	    file->stat.st_nlink)
+		fprintf(where, "  dev %ld, ino %ld, links %ld\n",
+			(long)file->stat.st_dev, (long)file->stat.st_ino,
+			(long)file->stat.st_nlink);
 	fprintf(where, "  size %ld, blksize %ld, blocks %ld\n",
 		(long)file->stat.st_size, (long)file->stat.st_blksize,
 		(long)file->stat.st_blocks);
