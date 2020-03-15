@@ -25,6 +25,7 @@ const char *fmd_filetype[] = {
 	"spreadsheet",
 	"presentation",
 	"mail",
+	"archive",
 };
 const char *fmd_elemtype[] = {
 	"title",
@@ -167,19 +168,9 @@ fmd_scan_file(struct FmdScanJob *job,
 	if (!job || !path || !info)
 		return (errno = EINVAL), -1;
 
-	size_t path_len = strlen(path);
-	size_t sz = sizeof(struct FmdFile) + path_len;
-	struct FmdFile *file = (struct FmdFile*)calloc(1, sz);
-	if (!file) {
-		job->log(job, path, fmdlt_oserr, "%s(%u): %s",
-			 "calloc", (unsigned)sz, strerror(ENOMEM));
-		FMDP_X(-1);
-		return -1;	/* errno should be ENOMEM */
-	}
-
-	strcpy(file->path, path);
-	file->name = strrchr(file->path, '/');
-	file->name = file->name ? file->name + 1 : file->path;
+	struct FmdFile *file = fmdp_file_new(job, path);
+	if (!file)
+		return -1;
 
 	int stflags = 0;	/* AT_SYMLINK_NOFOLLOW? */
 	int res = fstatat(dirfd, dirfd != AT_FDCWD ? file->name : file->path,
@@ -193,10 +184,10 @@ fmd_scan_file(struct FmdScanJob *job,
 	}
 
 	const int is_dir = S_ISDIR(file->stat.st_mode);
-	if (!is_dir)
-		file->mimetype = "application/binary-stream";
-	else
+	if (is_dir) {
 		file->filetype = fmdft_directory;
+		file->mimetype = 0;
+	}
 
 	*info = file;
 	if (!is_dir && (job->flags & fmdsf_metadata) == fmdsf_metadata)
@@ -336,10 +327,24 @@ fmd_scan(struct FmdScanJob *job)
 		 * |log| is assigned, can be avoided everywhere */
 		job->log = &fmd_dummy_log;
 
+	size_t sz = sizeof (*job->priv);
+	job->priv = (struct FmdPriv*)malloc(sz);
+	if (!job->priv) {
+		job->log(job, 0, fmdlt_oserr, "%s(%u): %s",
+			 "calloc", (unsigned)sz, strerror(ENOMEM));
+		FMDP_X(-1);
+		return -1;
+	}
+
+	int rv;
 	if ((job->flags & fmdsf_recursive) != fmdsf_recursive)
-		return fmd_scan_file(job, AT_FDCWD, job->location,
-				     &job->first_file);
-	return fmd_scan_hier(job, AT_FDCWD, job->location, &job->first_file);
+		rv = fmd_scan_file(job, AT_FDCWD, job->location,
+				   &job->first_file);
+	else
+		rv = fmd_scan_hier(job, AT_FDCWD, job->location, &job->first_file);
+
+	free(job->priv); job->priv = 0;
+	return rv;
 }
 
 

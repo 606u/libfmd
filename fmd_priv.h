@@ -20,6 +20,12 @@
 #    define FMDP_X(_res)
 #  endif
 
+struct FmdPriv {
+	char scratch[32768];
+};
+
+struct FmdFile* fmdp_file_new(struct FmdScanJob *job, const char *path);
+
 /* Adds metadata to |file| */
 int fmdp_add_n(struct FmdFile *file,
 	       enum FmdElemType elemtype, long value);
@@ -85,6 +91,8 @@ struct FmdStream {
 	struct FmdScanJob *job;
 	struct FmdFile *file;
 };
+struct FmdStream* fmdp_cache_stream(struct FmdStream *stream);
+
 struct FmdStream* fmdp_open_file(struct FmdScanJob *job,
 				 int dirfd, struct FmdFile *file, int cached);
 
@@ -98,6 +106,7 @@ long fmdp_get_bits_be(const uint8_t *p, size_t offs, size_t len);
 long fmdp_get_bits_le(const uint8_t *p, size_t offs, size_t len);
 
 int fmdp_probe_file(struct FmdScanJob *job, int dirfd, struct FmdFile *info);
+int fmdp_probe_stream(struct FmdStream *stream);
 
 /* Reads 1st page or whole file, whatever is less, defines |len|, |p|
  * and |endp|; returns -1 on failure to do so */
@@ -142,5 +151,6 @@ int fmdp_do_mp3v2(struct FmdStream *stream);
 int fmdp_do_bmff(struct FmdStream *stream);
 int fmdp_do_tiff(struct FmdStream *stream);
 int fmdp_do_exif(struct FmdStream *stream);
+int fmdp_do_arch(struct FmdStream *stream);
 
 #endif /* LIB_FILE_METADATA_PRIV_H defined? */

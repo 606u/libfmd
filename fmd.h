@@ -12,7 +12,7 @@ enum FmdScanFlags {
 
 	/* also scan for metadata */
 	fmdsf_metadata = 1 << 1,
-	/* also scan archived files (not currently implemented) */
+	/* also scan archived files */
 	fmdsf_archives = 1 << 2
 };
 
@@ -37,6 +37,8 @@ enum FmdFileType {
 	fmdft_spreadsheet,
 	fmdft_presentation,
 	fmtft_mail,
+	/* Contains directories and files, for example a zip file */
+	fmdft_archive,
 };
 extern const char *fmd_filetype[];
 
@@ -133,6 +135,9 @@ struct FmdScanJob {
 	size_t n_physreads, n_logreads;
 	off_t v_physreads, v_logreads;
 	size_t n_cachehits, n_cachemisses;
+
+	/* Private pointer for internal use */
+	struct FmdPriv *priv;
 };
 
 /* Read metadata from a file or a directory tree at |job->location|,

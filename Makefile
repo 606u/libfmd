@@ -1,5 +1,5 @@
 
-CFLAGS = -Wall -Wextra
+CFLAGS = -Wall -Wextra -Werror
 
 build ?= debug
 buildflags = $(build)
@@ -7,7 +7,7 @@ buildflags := $(buildflags:debug=-D_DEBUG -O0)
 buildflags := $(buildflags:release=-DNDEBUG -O2)
 CFLAGS += $(buildflags)
 
-libfmd_sources = fmd.c fmd_priv.c fmd_audio.c fmd_bmff.c fmd_tiff.c fmd_exif.c
+libfmd_sources = fmd.c fmd_priv.c fmd_audio.c fmd_bmff.c fmd_tiff.c fmd_exif.c fmd_arch.c
 libfmd_objects = $(libfmd_sources:.c=.o)
 libfmd_so = libfmd.so.0
 libfmd_a = libfmd.a
@@ -22,7 +22,7 @@ clean:
 	rm -f $(libfmd_objects) $(libfmd_so) $(libfmd_a) $(fmdscan) $(fmdscan_objects)
 
 $(fmdscan): $(fmdscan_objects) $(libfmd_a)
-	$(CC) $(LDFLAGS) -g -o $@ $(fmdscan_objects) -L. -lfmd
+	$(CC) $(LDFLAGS) -g -o $@ $(fmdscan_objects) -L. -lfmd -larchive
 
 $(libfmd_so): $(libfmd_objects)
 	$(CC) -fPIC -shared -g $(libfmd_objects) -o $@

@@ -12,6 +12,31 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+struct FmdFile*
+fmdp_file_new(struct FmdScanJob *job,
+	      const char *path)
+{
+	assert(job);
+	assert(path);
+
+	size_t path_len = strlen(path);
+	size_t sz = sizeof(struct FmdFile) + path_len;
+	struct FmdFile *file = (struct FmdFile*)calloc(1, sz);
+	if (!file) {
+		job->log(job, path, fmdlt_oserr, "%s(%u): %s",
+			 "calloc", (unsigned)sz, strerror(ENOMEM));
+		FMDP_X(-1);
+		return 0;	/* errno should be ENOMEM */
+	}
+
+	strcpy(file->path, path);
+	file->name = strrchr(file->path, '/');
+	file->name = file->name ? file->name + 1 : file->path;
+	file->mimetype = "application/binary-stream";
+	return file;
+}
+
+
 static int
 fmdp_gcd(int a, int b)
 {
@@ -765,6 +790,19 @@ fmdp_probe_file(struct FmdScanJob *job,
 	}
 	stream->job = job;
 
+	int rv = fmdp_probe_stream(stream);
+	stream->close(stream);
+	return rv;
+}
+
+
+int
+fmdp_probe_stream(struct FmdStream *stream)
+{
+	assert(stream);
+
+	struct FmdScanJob *job = stream->job;
+
 	const off_t ssize = stream->size(stream);
 	size_t len = FMDP_READ_PAGE_SZ;
 	if ((off_t)len > ssize)
@@ -794,11 +832,13 @@ fmdp_probe_file(struct FmdScanJob *job,
 		    !memcmp(p + 6, "Exif", 4) &&
 		    fmdp_do_exif(stream) == 0)
 			goto end;
+		/* XXX: consider delaying this for a second stage */
+		if ((job->flags & fmdsf_archives) == fmdsf_archives &&
+		    fmdp_do_arch(stream) == 0)
+			goto end;
 	} else
-		job->log(job, file->path, fmdlt_oserr, "%s(%s): %s",
-			 "read", file->path, strerror(errno));
-
+		job->log(job, stream->file->path, fmdlt_oserr, "%s(%s): %s",
+			 "read", stream->file->path, strerror(errno));
 end:
-	stream->close(stream);
 	return 0;
 }
