@@ -546,6 +546,7 @@ fmdp_cache_stream(struct FmdStream *stream)
 		cstr->base.size = &fmdp_cached_stream_size;
 		cstr->base.get = &fmdp_cached_stream_get;
 		cstr->base.close = &fmdp_cached_stream_close;
+		cstr->base.job = stream->job;
 		cstr->base.file = stream->file;
 		cstr->next = stream;
 		cstr->last_hit = cstr->page;
