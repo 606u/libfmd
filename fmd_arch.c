@@ -62,7 +62,6 @@ fmdp_do_arch(struct FmdStream *stream)
 
 	struct FmdScanJob *job = stream->job;
 	int rv = 0;
-	size_t fpathlen = strlen(stream->file->path);
 
 	struct FmdArchState ast;
 	ast.stream = stream;
@@ -89,19 +88,17 @@ fmdp_do_arch(struct FmdStream *stream)
 		struct archive_entry *entry;
 		while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
 			const char *epath = archive_entry_pathname(entry);
-			size_t epathlen = strlen(epath);
 
 			if (fmd_arch_trace)
 				job->log(job, stream->file->path, fmdlt_trace,
 					 " -> %s", epath);
-			size_t sz = sizeof (struct FmdFile) + fpathlen + 1 + epathlen;
-			struct FmdFile *file = (struct FmdFile*)calloc(1, sz);
-			if (!file)
-				/* XXX: set errno to ENOMEM needed? */
+			snprintf(job->priv->scratch, sizeof (job->priv->scratch),
+				 "%s/%s", stream->file->path, epath);
+			struct FmdFile *file = fmdp_file_new(job, job->priv->scratch);
+			if (!file) {
+				rv = -1;
 				break;
-			snprintf(file->path, fpathlen + 1 + epathlen + 1, "%s/%s",
-				 stream->file->path, epath);
-			file->name = strrchr(file->path, '/') + 1;
+			}
 			file->stat = *archive_entry_stat(entry);
 
 			if (tail)

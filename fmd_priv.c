@@ -12,6 +12,31 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+struct FmdFile*
+fmdp_file_new(struct FmdScanJob *job,
+	      const char *path)
+{
+	assert(job);
+	assert(path);
+
+	size_t path_len = strlen(path);
+	size_t sz = sizeof(struct FmdFile) + path_len;
+	struct FmdFile *file = (struct FmdFile*)calloc(1, sz);
+	if (!file) {
+		job->log(job, path, fmdlt_oserr, "%s(%u): %s",
+			 "calloc", (unsigned)sz, strerror(ENOMEM));
+		FMDP_X(-1);
+		return 0;	/* errno should be ENOMEM */
+	}
+
+	strcpy(file->path, path);
+	file->name = strrchr(file->path, '/');
+	file->name = file->name ? file->name + 1 : file->path;
+	file->mimetype = "application/binary-stream";
+	return file;
+}
+
+
 static int
 fmdp_gcd(int a, int b)
 {

@@ -20,6 +20,12 @@
 #    define FMDP_X(_res)
 #  endif
 
+struct FmdPriv {
+	char scratch[32768];
+};
+
+struct FmdFile* fmdp_file_new(struct FmdScanJob *job, const char *path);
+
 /* Adds metadata to |file| */
 int fmdp_add_n(struct FmdFile *file,
 	       enum FmdElemType elemtype, long value);

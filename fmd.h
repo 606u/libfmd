@@ -135,6 +135,9 @@ struct FmdScanJob {
 	size_t n_physreads, n_logreads;
 	off_t v_physreads, v_logreads;
 	size_t n_cachehits, n_cachemisses;
+
+	/* Private pointer for internal use */
+	struct FmdPriv *priv;
 };
 
 /* Read metadata from a file or a directory tree at |job->location|,
