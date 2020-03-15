@@ -91,6 +91,8 @@ struct FmdStream {
 	struct FmdScanJob *job;
 	struct FmdFile *file;
 };
+struct FmdStream* fmdp_cache_stream(struct FmdStream *stream);
+
 struct FmdStream* fmdp_open_file(struct FmdScanJob *job,
 				 int dirfd, struct FmdFile *file, int cached);
 

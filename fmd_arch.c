@@ -55,6 +55,104 @@ fmdp_arch_close_callback(struct archive *a, void *udata)
 }
 
 
+/* Forward-only FmdStream on top of libarchive(3) entry. Best used
+ * with FmdCachedStream to provide *rudimentary* seeking support */
+struct FmdArchStream {
+	struct FmdStream base;
+
+	struct archive *a;
+	struct archive_entry *entry;
+	off_t size, off;
+	char buf[FMDP_READ_PAGE_SZ];
+};
+#define FMDP_GET_ASTR(_stream)			\
+	(struct FmdArchStream*)((_stream) - offsetof(struct FmdArchStream, base))
+
+static off_t
+fmdp_arch_stream_size(struct FmdStream *stream)
+{
+	assert(stream);
+	struct FmdArchStream *astr = FMDP_GET_ASTR(stream);
+	return (off_t)archive_entry_size(astr->entry);
+}
+
+static const uint8_t*
+fmdp_arch_stream_get(struct FmdStream *stream,
+		     off_t offs, size_t len)
+{
+	assert(stream);
+	assert(len);
+	assert(len <= FMDP_READ_PAGE_SZ);
+
+	printf("fmdp_arch_stream_get(%p, %u, %u)\n", stream, (unsigned)offs, (unsigned)len);
+	struct FmdArchStream *astr = FMDP_GET_ASTR(stream);
+	off_t skip = offs - astr->off;
+	if (skip < 0) {
+		/* Cannot seek backwards; that is what FmdCachedStream
+		 * is for. */
+		errno = ESPIPE;
+		return 0;
+	}
+
+	/* Cannot seek, therefore read and discard */
+	int rv;
+	while (skip) {
+		off_t l = skip > FMDP_READ_PAGE_SZ ? FMDP_READ_PAGE_SZ : skip;
+		if ((rv = archive_read_data(astr->a, astr->buf, l)) != l)
+			goto err;
+		astr->off += l;
+	}
+
+	if (astr->off + (off_t)len > astr->size)
+		len = (size_t)(astr->size - astr->off);
+	if ((rv = archive_read_data(astr->a, astr->buf, len)) == (int)len) {
+		/* Success */
+		astr->off += len;
+		return (uint8_t*)astr->buf;
+	}
+
+err:
+	stream->job->log(stream->job, stream->file->path, fmdlt_oserr,
+			 "archive_read_data: %s", archive_error_string(astr->a));
+	errno = EIO;
+	return 0;
+}
+
+static void
+fmdp_arch_stream_close(struct FmdStream *stream)
+{
+	assert(stream);
+	struct FmdArchStream *astr = FMDP_GET_ASTR(stream);
+	/* Nothing to close */
+	archive_read_data_skip(astr->a);
+	free(astr);
+}
+
+static struct FmdStream*
+fmdp_arch_stream(struct FmdScanJob *job, struct FmdFile *file,
+		 struct archive *a, struct archive_entry *entry)
+{
+	assert(job);
+	assert(file);
+	assert(a);
+	assert(entry);
+	struct FmdArchStream *astr = (struct FmdArchStream*)calloc (1, sizeof (*astr));
+	if (astr) {
+		astr->base.size = fmdp_arch_stream_size;
+		astr->base.get = &fmdp_arch_stream_get;
+		astr->base.close = &fmdp_arch_stream_close;
+		astr->base.job = job;
+		astr->base.file = file;
+		astr->a = a;
+		astr->entry = entry;
+		astr->size = (off_t)archive_entry_size(entry);
+		astr->off = 0;
+		return &astr->base;
+	}
+	return 0;
+}
+
+
 int
 fmdp_do_arch(struct FmdStream *stream)
 {
@@ -100,6 +198,19 @@ fmdp_do_arch(struct FmdStream *stream)
 				break;
 			}
 			file->stat = *archive_entry_stat(entry);
+
+			struct FmdStream *uncached =
+				fmdp_arch_stream(job, file, a, entry);
+			if (uncached) {
+				struct FmdStream *cached = fmdp_cache_stream(uncached);
+				if (cached) {
+					rv = fmdp_probe_stream(cached);
+					cached->close(cached);
+				} else {
+					rv = fmdp_probe_stream(uncached);
+					uncached->close(uncached);
+				}
+			} /* else cannot probe */
 
 			if (tail)
 				tail->next = file;
